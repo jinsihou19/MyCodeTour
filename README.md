@@ -86,9 +86,9 @@ Search "MyCodeTour" > Click <kbd>Install</kbd>
 ```markdown
 # Order Module Walkthrough
 ## Core Flow
-1. Order Entry → OrderController.create() 
-2. Pricing Strategy → PriceCalculator.applyDiscounts()
-3. Payment State Machine → PaymentStateMachine.handle()
+1. Order Entry → [[OrderController.create()]]
+2. Pricing Strategy → [[PriceCalculator.applyDiscounts()]]
+3. Payment State Machine → [[PaymentStateMachine.handle()]]
 
 ## Resources
 - [Architecture Decision Record]()
@@ -104,7 +104,7 @@ A[Gateway Notification] --> B{Signature Valid?}
 B -->|Yes| C[Update Order Status]
 B -->|No| D[Log Security Alert]
 ```
-> 🔐 Transaction boundary management in `PaymentService#processCallback`
+> 🔐 Transaction boundary management in [[PaymentService#processCallback]]
 ````
 
 ---

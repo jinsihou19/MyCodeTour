@@ -67,9 +67,9 @@
 ```markdown
 # 订单模块导览
 ## 核心流程
-1. 订单创建入口 → OrderController.create()
-2. 价格计算策略 → PriceCalculator.applyDiscounts()
-3. 支付状态机 → PaymentStateMachine.handle()
+1. 订单创建入口 → [[OrderController.create()]]
+2. 价格计算策略 → [[PriceCalculator.applyDiscounts()]]
+3. 支付状态机 → [[PaymentStateMachine.handle()]]
 
 ## 扩展阅读
 - [架构设计文档]()
@@ -85,7 +85,7 @@ A[支付网关通知] --> B{验签成功?}
 B -->|是| C[更新订单状态]
 B -->|否| D[记录异常日志]
 ```
-> 📌 注意事务边界处理，参考 `PaymentService#processCallback`
+> 📌 注意事务边界处理，参考 [[PaymentService#processCallback]]
 ````
 
 ---
