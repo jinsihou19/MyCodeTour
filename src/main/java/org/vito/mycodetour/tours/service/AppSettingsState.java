@@ -5,8 +5,6 @@ import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.util.xmlb.XmlSerializerUtil;
-import lombok.Getter;
-import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,11 +17,9 @@ import org.jetbrains.annotations.Nullable;
 * Created on 2025/01/01
  */
 @State(
-      name = "org.uom.lefterisxris.codetour.tours.service.AppSettingsState",
+      name = "org.vito.mycodetour.tours.service.AppSettingsState",
       storages = @Storage("CodeTourSettings.xml")
 )
-@Getter
-@Setter
 public class AppSettingsState implements PersistentStateComponent<AppSettingsState> {
 
    private boolean onboardingAssistant = true;
@@ -58,5 +54,41 @@ public class AppSettingsState implements PersistentStateComponent<AppSettingsSta
 
    public enum SortDirectionE {
       ASC, DESC;
+   }
+
+   public boolean isOnboardingAssistant() {
+      return onboardingAssistant;
+   }
+
+   public AppSettingsState setOnboardingAssistant(boolean onboardingAssistant) {
+      this.onboardingAssistant = onboardingAssistant;
+      return this;
+   }
+
+   public SortOptionE getSortOption() {
+      return sortOption;
+   }
+
+   public AppSettingsState setSortOption(SortOptionE sortOption) {
+      this.sortOption = sortOption;
+      return this;
+   }
+
+   public SortDirectionE getSortDirection() {
+      return sortDirection;
+   }
+
+   public AppSettingsState setSortDirection(SortDirectionE sortDirection) {
+      this.sortDirection = sortDirection;
+      return this;
+   }
+
+   public String getSourcePath() {
+      return sourcePath;
+   }
+
+   public AppSettingsState setSourcePath(String sourcePath) {
+      this.sourcePath = sourcePath;
+      return this;
    }
 }

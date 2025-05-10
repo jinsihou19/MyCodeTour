@@ -34,7 +34,7 @@ public class TourSelectionDialogWrapper extends DialogWrapper {
 
         var tours = StateManager.getInstance().getState(project).getTours();
 
-        // Onboarding Assistant should not be present in this selection
+        // Demo should not be present in this selection
         tours.removeIf(Validator::isDemo);
 
         final int toursSize = tours.size();

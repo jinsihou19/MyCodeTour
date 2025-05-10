@@ -231,7 +231,7 @@ public class ToolPaneWindow {
 
                 DefaultMutableTreeNode targetNode = (DefaultMutableTreeNode) targetPath.getLastPathComponent();
 
-                // 只允许拖放到Tour节点或Step节点上，但不允许拖放到Virtual Onboarding Assistant
+                // 只允许拖放到Tour节点或Step节点上，但不允许拖放到Demo
                 if (targetNode.getUserObject() instanceof Tour) {
                     Tour targetTour = (Tour) targetNode.getUserObject();
                     if (Validator.isDemo(targetTour)) {
@@ -246,11 +246,11 @@ public class ToolPaneWindow {
                     event.setDropPossible(true, "Drop here to move step");
                     return true;
                 } else if (targetNode.getUserObject() instanceof Step) {
-                    // 检查父节点是否是Virtual Onboarding Assistant
+                    // 检查父节点是否是Demo
                     DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) targetNode.getParent();
                     if (parentNode.getUserObject() instanceof Tour parentTour) {
                         if (Validator.isDemo(parentTour)) {
-                            event.setDropPossible(false, "Cannot drop into Virtual Onboarding Assistant");
+                            event.setDropPossible(false, "Cannot drop into Demo");
                             return false;
                         }
                     }
@@ -460,8 +460,8 @@ public class ToolPaneWindow {
             final JMenuItem newTourAction = new JMenuItem("Create New Tour", AllIcons.Actions.AddFile);
             newTourAction.addActionListener(d -> createNewTourListener());
 
-            // Enable/Disable Virtual Onboarding Assistant
-            final String title = String.format("%s Virtual Onboarding Assistant",
+            // Enable/Disable Demo
+            final String title = String.format("%s Demo",
                     AppSettingsState.getInstance().isOnboardingAssistantOn() ? "Disable" : "Enable");
             final Icon icon = AppSettingsState.getInstance().isOnboardingAssistantOn()
                     ? AllIcons.Actions.IntentionBulbGrey
@@ -500,8 +500,8 @@ public class ToolPaneWindow {
             deleteAction.addActionListener(d -> deleteTourListener(tour));
 
             if (Validator.isDemo(tour)) {
-                // Disable Onboarding Assistant Action
-                final JMenuItem disableOnboardAssistantAction = new JMenuItem("Disable Onboarding Assistant",
+                // Disable Demo Action
+                final JMenuItem disableOnboardAssistantAction = new JMenuItem("Disable Demo",
                         AllIcons.Actions.IntentionBulbGrey);
                 disableOnboardAssistantAction.addActionListener(d -> {
                     AppSettingsState.getInstance().setOnboardingAssistant(false);
@@ -572,7 +572,7 @@ public class ToolPaneWindow {
     private void createNewTourListener() {
         final Tour newTour = Tour.builder()
                 .id(UUID.randomUUID().toString())
-                .touFile("newTour" + Props.TOUR_EXTENSION_FULL)
+                .tourFile("newTour" + Props.TOUR_EXTENSION_FULL)
                 .title("A New Tour")
                 .description("A New Tour")
                 .createdAt(LocalDateTime.now())

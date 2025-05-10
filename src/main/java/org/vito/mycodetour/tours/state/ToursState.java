@@ -193,7 +193,7 @@ public class ToursState {
                 toursDir = createToursDir();
                 if (toursDir.isEmpty()) {
                     throw new PluginException("Could not find or creat '.tours' directory. Tour creation failed",
-                            PluginId.findId("org.uom.lefterisxris.codetour"));
+                            PluginId.findId("org.vito.mycodetour"));
                 }
             }
             // Persist the file

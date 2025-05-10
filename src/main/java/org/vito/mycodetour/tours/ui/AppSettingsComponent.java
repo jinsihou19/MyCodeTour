@@ -26,7 +26,7 @@ import java.io.File;
 public class AppSettingsComponent {
 
     private final JPanel mainPanel;
-    private final JBCheckBox onboardingAssistantCb = new JBCheckBox("Enable/disable virtual onboarding assistant");
+    private final JBCheckBox onboardingAssistantCb = new JBCheckBox("Enable/disable demo");
     private final ComboBox<AppSettingsState.SortOptionE> sortOption =
             new ComboBox<>(AppSettingsState.SortOptionE.values());
     private final ComboBox<AppSettingsState.SortDirectionE> sortDirection =

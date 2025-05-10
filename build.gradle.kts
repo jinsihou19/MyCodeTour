@@ -25,7 +25,6 @@ repositories {
 }
 
 
-
 // Configure Gradle IntelliJ Plugin - read more: https://github.com/JetBrains/gradle-intellij-plugin
 intellij {
     pluginName.set(properties("pluginName"))
@@ -122,10 +121,5 @@ tasks {
 }
 
 dependencies {
-    // https://mvnrepository.com/artifact/org.projectlombok/lombok
-    compileOnly("org.projectlombok:lombok:1.18.22")
-    annotationProcessor("org.projectlombok:lombok:1.18.22")
     testImplementation("org.mockito:mockito-core:5.15.2")
-//    testImplementation("org.junit.jupiter:junit-jupiter")
-    testAnnotationProcessor("org.projectlombok:lombok:1.18.22")
 }

@@ -69,7 +69,7 @@ public class UtilsTests {
         for (int i = 1; i < 10; i++) {
             var tour = Tour.builder()
                     .title("Tour " + i)
-                    .touFile("tour_" + i + ".json")
+                    .tourFile("tour_" + i + ".json")
                     .createdAt(i == 5 ? null : LocalDateTime.now().plusMinutes(i))
                     .build();
             tours.add(tour);

@@ -32,8 +32,8 @@ import static org.vito.mycodetour.tours.service.Utils.renderFullDoc;
 /**
  * Editor (as dialog) for Step editing. Supports preview
  *
-* @author vito
-* Created on 2025/1/1
+ * @author vito
+ * Created on 2025/1/1
  */
 public class StepEditor extends DialogWrapper {
 
@@ -180,28 +180,28 @@ public class StepEditor extends DialogWrapper {
                 "});" +
                 "var initialValue = '" + escapeJavaScript(currentMarkdown) + "';" +
                 """
-                    var easyMDE = new EasyMDE({
-                        element: document.getElementById('editor'),
-                        initialValue: initialValue,
-                        autofocus: true,
-                        spellChecker: false,
-                        status: false,
-                        insertTexts: {
-                            link: ["[", "](navigate://)"],
-                        },
-                        toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', 'clean-block', 'table', 'code', '|', 'link', 'image', '|', 'undo', 'redo', 'fullscreen'],
-                        previewRender: function (plainText) {
-                            var preview = document.createElement('div');
-                            preview.className = 'markdown-body';
-                            preview.innerHTML = marked.parse(plainText);
-                            mermaid.init(undefined, preview.querySelectorAll('language-mermaid'));
-                            return preview.innerHTML;
-                        },
-                        renderingConfig: {
-                            codeSyntaxHighlighting: true,
-                        }
-                    });
-                """ +
+                            var easyMDE = new EasyMDE({
+                                element: document.getElementById('editor'),
+                                initialValue: initialValue,
+                                autofocus: true,
+                                spellChecker: false,
+                                status: false,
+                                insertTexts: {
+                                    link: ["[", "](navigate://)"],
+                                },
+                                toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', 'clean-block', 'table', 'code', '|', 'link', 'image', '|', 'undo', 'redo', 'fullscreen'],
+                                previewRender: function (plainText) {
+                                    var preview = document.createElement('div');
+                                    preview.className = 'markdown-body';
+                                    preview.innerHTML = marked.parse(plainText);
+                                    mermaid.init(undefined, preview.querySelectorAll('language-mermaid'));
+                                    return preview.innerHTML;
+                                },
+                                renderingConfig: {
+                                    codeSyntaxHighlighting: true,
+                                }
+                            });
+                        """ +
                 "easyMDE.codemirror.on('change', function() {" +
                 "  " + jsQuery.inject("easyMDE.value()") + ";" +
                 "});" +
