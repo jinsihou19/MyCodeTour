@@ -1,0 +1,49 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>org.vito.mycodetour</id>
+    <name>MyCodeTour</name>
+    <vendor>vito</vendor>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Tours Navigation" anchor="right" icon="Icons.LOGO_16"
+                    factoryClass="org.vito.mycodetour.tours.ui.ToolPaneWindowFactory"/>
+        <notificationGroup id="CodeTour-Notification" displayType="BALLOON"/>
+        <codeInsight.lineMarkerProvider language=""
+                                        implementationClass="org.vito.mycodetour.tours.ui.TourLineMarkerProvider"/>
+
+        <applicationService serviceImplementation="org.vito.mycodetour.tours.service.AppSettingsState"/>
+        <applicationConfigurable
+                parentId="tools"
+                instance="org.vito.mycodetour.tours.service.AppSettingsConfigurable"
+                id="org.vito.mycodetour.tours.service.AppSettingsConfigurable"
+                displayName="CodeTour Plugin Settings"/>
+
+    </extensions>
+
+    <actions>
+        <group id="CodeTourGroupedActions" text="Code Tour" description="Code Tour related actions"
+               popup="true" icon="Icons.LOGO_16">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="PrevStepNav" class="org.vito.mycodetour.tours.actions.NavigatePrevStepAction"
+                    text="Previous Step" description="Navigate to the Previous Step"
+                    icon="AllIcons.Actions.Back">
+                <keyboard-shortcut first-keystroke="control alt Q" keymap="$default"/>
+            </action>
+            <action id="NextStepNav" class="org.vito.mycodetour.tours.actions.NavigateNextStepAction"
+                    text="Next Step" description="Navigate to the Next Step"
+                    icon="AllIcons.Actions.Forward">
+                <keyboard-shortcut first-keystroke="control alt W" keymap="$default"/>
+            </action>
+        </group>
+
+        <action id="org.vito.mycodetour.tours.actions.TourStepGeneratorAction"
+                class="org.vito.mycodetour.tours.actions.TourStepGeneratorAction"
+                text="Add Tour Step"
+                description="Set this point a tour step">
+            <add-to-group group-id="EditorGutterPopupMenu" anchor="first"/>
+        </action>
+    </actions>
+
+</idea-plugin>
