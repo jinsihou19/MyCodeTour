@@ -11,6 +11,8 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.pom.Navigatable;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiField;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
@@ -23,6 +25,8 @@ import org.vito.mycodetour.tours.state.StateManager;
 import org.vito.mycodetour.tours.state.StepSelectionNotifier;
 import org.vito.mycodetour.tours.ui.CodeTourNotifier;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,12 +34,14 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
+import static org.vito.mycodetour.tours.service.PsiHelper.methodWithParameter;
+
 /**
  * Navigator class that navigates the user to the location that a step indicates.
  * Also renders the Step's description to the editor (as notification for now)
  *
-* @author vito
-* Created on 2025/01/01
+ * @author vito
+ * Created on 2025/01/01
  */
 public class Navigator {
 
@@ -47,9 +53,15 @@ public class Navigator {
         if (project.getBasePath() == null) return;
 
         SlowOperations.allowSlowOperations(() -> {
+            // Show Step's popup and return
+            renderStep.accept(step, project);
 
             if (step.getFile() == null) {
-                renderStep.accept(step, project);
+                return;
+            }
+
+            if (step.getLine() == null) {
+                navigateJavaPsi(step.getFile(), project);
                 return;
             }
 
@@ -90,8 +102,6 @@ public class Navigator {
                 navigateLine(step, project, validVirtualFiles.get(0));
             }
 
-            // Show Step's popup and return
-            renderStep.accept(step, project);
         });
     }
 
@@ -170,7 +180,7 @@ public class Navigator {
         if (parts.length == 2) {
             String className = parts[0];
             String methodName = parts[1];
-            navigateToMethod(className, methodName, project);
+            navigateToMethodField(className, methodName, project);
         } else {
             navigateToClass(parts[0], project);
         }
@@ -190,7 +200,7 @@ public class Navigator {
     /**
      * 导航到指定的类和方法
      */
-    private static void navigateToMethod(String className, String methodName, @NotNull Project project) {
+    private static void navigateToMethodField(String className, String methodName, @NotNull Project project) {
         PsiClass psiClass = JavaPsiFacade.getInstance(project)
                 .findClass(className, GlobalSearchScope.allScope(project));
 
@@ -199,21 +209,47 @@ public class Navigator {
             return;
         }
 
-        for (PsiMethod method : psiClass.getMethods()) {
-            if (method.getName().equals(methodName)) {
-                Navigatable navigatable = (Navigatable) method.getNavigationElement();
-                if (navigatable.canNavigate()) {
-                    navigatable.navigate(true);
-                    return;
+        // 携带签名的方法引用
+        if (methodName.contains("(")) {
+            String methodNameDecode = URLDecoder.decode(methodName, StandardCharsets.UTF_8);
+            for (PsiMethod method : psiClass.getMethods()) {
+                if (methodWithParameter(method).equals(methodNameDecode)) {
+                    if (navigatePsiElement(method)) {
+                        return;
+                    }
+                }
+            }
+        } else {
+            // 先找方法
+            for (PsiMethod method : psiClass.getMethods()) {
+                if (method.getName().equals(methodName)) {
+                    if (navigatePsiElement(method)) {
+                        return;
+                    }
+                }
+            }
+
+            // 从字段中再找一下
+            for (PsiField field : psiClass.getFields()) {
+                if (field.getName().equals(methodName)) {
+                    if (navigatePsiElement(field)) {
+                        return;
+                    }
                 }
             }
         }
 
         // 没有这个方法就导航到类吧
-        Navigatable navigatable = (Navigatable) psiClass.getNavigationElement();
+        navigatePsiElement(psiClass);
+    }
+
+    private static boolean navigatePsiElement(PsiElement element) {
+        Navigatable navigatable = (Navigatable) element.getNavigationElement();
         if (navigatable.canNavigate()) {
             navigatable.navigate(true);
+            return true;
         }
+        return false;
     }
 
     /**
@@ -228,10 +264,7 @@ public class Navigator {
             return;
         }
 
-        Navigatable navigatable = (Navigatable) psiClass.getNavigationElement();
-        if (navigatable.canNavigate()) {
-            navigatable.navigate(true);
-        }
+        navigatePsiElement(psiClass);
     }
 
     /**
@@ -239,7 +272,7 @@ public class Navigator {
      * 格式：tour:abc.tour#stepTitle
      */
     public static void navigateTour(String tourUrl, Project project) {
-        if(!tourUrl.startsWith(TOUR)) {
+        if (!tourUrl.startsWith(TOUR)) {
             return;
         }
 

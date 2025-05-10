@@ -215,8 +215,7 @@ public class StepEditor extends DialogWrapper {
         final JBScrollPane editorPane = new JBScrollPane(editorBrowser.getComponent());
 
         titleTextField = new JBTextField(step.getTitle());
-        referenceTextField =
-                new JBTextField(step.getFile() != null ? String.format("%s:%s", step.getFile(), step.getLine()) : "");
+        referenceTextField = new JBTextField(step.reference());
 
         final JPanel textFieldsGridPanel = UI.PanelFactory.grid()
                 .add(UI.PanelFactory.panel(titleTextField)

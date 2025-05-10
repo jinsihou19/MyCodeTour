@@ -25,8 +25,8 @@ import static org.vito.mycodetour.tours.service.Utils.renderFullDoc;
 /**
  * Renders a Popup which includes the Step Documentation
  *
-* @author vito
-* Created on 2025/1/1
+ * @author vito
+ * Created on 2025/1/1
  */
 public class StepRendererPane extends JPanel {
 
@@ -60,7 +60,7 @@ public class StepRendererPane extends JPanel {
         final String stepDoc = renderFullDoc(
                 StateManager.getInstance().getState(project).getStepMetaLabel(step.getTitle()),
                 step.getDescription(),
-                step.getFile() != null ? String.format("%s:%s", step.getFile(), step.getLine()) : "");
+                step.reference());
 
 //        CefApp.getInstance().registerSchemeHandlerFactory(
 //                "file",

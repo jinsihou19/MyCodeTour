@@ -4,11 +4,20 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiField;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiMethod;
+import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
 import org.vito.mycodetour.tours.domain.Step;
 import org.vito.mycodetour.tours.domain.Tour;
+import org.vito.mycodetour.tours.service.PsiHelper;
 import org.vito.mycodetour.tours.state.StateManager;
 import org.vito.mycodetour.tours.state.TourUpdateNotifier;
 import org.vito.mycodetour.tours.ui.StepEditor;
@@ -25,60 +34,83 @@ import static java.util.Objects.isNull;
  */
 public class TourStepGeneratorAction extends AnAction {
 
-   private static final Logger LOG = Logger.getInstance(TourStepGeneratorAction.class);
+    private static final Logger LOG = Logger.getInstance(TourStepGeneratorAction.class);
 
-   @Override
-   public void actionPerformed(@NotNull AnActionEvent e) {
-      final Project project = e.getProject();
-      if (isNull(project) || isNull(project.getBasePath()))
-         return;
-
-      final Object lineObj = e.getDataContext().getData("EditorGutter.LOGICAL_LINE_AT_CURSOR");
-      final int line = (lineObj != null ? Integer.parseInt(lineObj.toString()) : 1) + 1;
-
-      final VirtualFile virtualFile = e.getDataContext().getData(CommonDataKeys.VIRTUAL_FILE);
-      if (virtualFile == null)
-         return;
+    @Override
+    public void actionPerformed(@NotNull AnActionEvent e) {
+        final Project project = e.getProject();
+        if (isNull(project) || isNull(project.getBasePath()))
+            return;
 
 
-      // If no activeTour is present, prompt to select one
-      if (StateManager.getInstance().getState(project).getActiveTour().isEmpty()) {
-         final TourSelectionDialogWrapper dialog = new TourSelectionDialogWrapper(project,
-               "Please Select the Tour to add the Step to");
-         if (dialog.showAndGet()) {
-            final Optional<Tour> selected = dialog.getSelected();
-            selected.ifPresent(StateManager.getInstance().getState(project)::setActiveTour);
-         }
-      }
+        Editor editor = e.getData(CommonDataKeys.EDITOR);
+        if (editor == null) {
+            return;
+        }
 
-      final Optional<Tour> activeTour = StateManager.getInstance().getState(project).getActiveTour();
-      if (activeTour.isPresent()) {
-         final Step step = generateStep(virtualFile, line);
+        PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
+        if (psiFile == null) {
+            return;
+        }
 
-         // Provide a dialog for Step editing
-         final StepEditor stepEditor = new StepEditor(project, step);
-         final boolean okSelected = stepEditor.showAndGet();
-         if (!okSelected) return; // i.e. cancel the step creation
+        int offset = editor.getCaretModel().getOffset();
+        PsiElement element = psiFile.findElementAt(offset);
+        PsiElement parent = PsiTreeUtil.getParentOfType(element, PsiClass.class, PsiField.class, PsiMethod.class);
+        if (parent == null) {
+            return;
+        }
 
-         final Step updatedStep = stepEditor.getUpdatedStep();
-         activeTour.get().getSteps().add(updatedStep);
-         StateManager.getInstance().getState(project).updateTour(activeTour.get());
+        Step step;
+        if (parent.equals(element.getContext())) {
+            String reference = null;
+            if (parent instanceof PsiClass psiClass) {
+                reference = psiClass.getQualifiedName();
+            } else if (parent instanceof PsiMethod psiMethod) {
+                reference = PsiHelper.buildMethodReference(psiMethod);
+            } else if (parent instanceof PsiField psiField) {
+                reference = PsiHelper.buildFieldReference(psiField);
+            }
+            step = Step.with(reference);
+        } else {
+            LogicalPosition logicalPosition = editor.getCaretModel().getLogicalPosition();
+            final int line = logicalPosition.line;
 
-         // Notify UI to re-render
-         project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(activeTour.get());
-      }
+            final VirtualFile virtualFile = e.getData(CommonDataKeys.VIRTUAL_FILE);
+            if (virtualFile == null) {
+                return;
+            }
+            step = Step.with(virtualFile.getName(), line);
+        }
 
-   }
 
-   private Step generateStep(VirtualFile virtualFile, int line) {
-      final String title = String.format("%s:%s", virtualFile.getName(), line);
-      LOG.info("Generating Step: " + title);
-      return Step.builder()
-            .title(title)
-            .description("Simple Navigation to " + title)
-            .file(virtualFile.getName())
-            .line(line)
-            .build();
-   }
+        // If no activeTour is present, prompt to select one
+        if (StateManager.getInstance().getState(project).getActiveTour().isEmpty()) {
+            final TourSelectionDialogWrapper dialog = new TourSelectionDialogWrapper(project,
+                    "Please Select the Tour to add the Step to");
+            if (dialog.showAndGet()) {
+                final Optional<Tour> selected = dialog.getSelected();
+                selected.ifPresent(StateManager.getInstance().getState(project)::setActiveTour);
+            }
+        }
+
+        final Optional<Tour> activeTour = StateManager.getInstance().getState(project).getActiveTour();
+        if (activeTour.isPresent()) {
+
+
+            // Provide a dialog for Step editing
+            final StepEditor stepEditor = new StepEditor(project, step);
+            final boolean okSelected = stepEditor.showAndGet();
+            if (!okSelected) return; // i.e. cancel the step creation
+
+            final Step updatedStep = stepEditor.getUpdatedStep();
+            activeTour.get().getSteps().add(updatedStep);
+            StateManager.getInstance().getState(project).updateTour(activeTour.get());
+
+            // Notify UI to re-render
+            project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(activeTour.get());
+        }
+
+    }
+
 
 }

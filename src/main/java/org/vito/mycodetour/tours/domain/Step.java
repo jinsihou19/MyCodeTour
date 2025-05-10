@@ -1,5 +1,7 @@
 package org.vito.mycodetour.tours.domain;
 
+import com.intellij.psi.PsiNameHelper;
+
 /**
  * 步骤
  *
@@ -93,11 +95,58 @@ public class Step {
         return this;
     }
 
+    public String reference() {
+        return getFile() == null
+                ? ""
+                : getLine() != null
+                ? String.format("%s:%s", getFile(), getLine())
+                : getFile();
+    }
+
     @Override
     public String toString() {
         return title;
     }
 
+    /**
+     * 创建step
+     *
+     * @param reference 引用，可能是文件也可能是方法类引用
+     * @return step
+     */
+    public static Step with(String reference) {
+
+        return Step.builder()
+                .title(PsiNameHelper.getShortClassName(reference))
+                .description("Simple Navigation to " + reference)
+                .file(reference)
+                .build();
+    }
+
+    /**
+     * 创建step
+     *
+     * @param reference 引用，可能是文件也可能是方法类引用
+     * @param line      行数
+     * @return step
+     */
+    public static Step with(String reference, int line) {
+        final String title = String.format("%s:%s",
+                PsiNameHelper.getShortClassName(reference.replace(".java", "")),
+                line);
+        return Step.builder()
+                .title(title)
+                .description("Simple Navigation to " + title)
+                .file(reference)
+                .line(line)
+                .build();
+    }
+
+    /**
+     * 建造器
+     *
+     * @return StepBuilder
+     */
     public static StepBuilder builder() {
         return new StepBuilder();
     }

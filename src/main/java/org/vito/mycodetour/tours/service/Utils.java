@@ -2,6 +2,7 @@ package org.vito.mycodetour.tours.service;
 
 import com.intellij.lang.documentation.DocumentationMarkup;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiNameHelper;
 import org.apache.commons.lang3.StringUtils;
 import org.intellij.markdown.ast.ASTNode;
 import org.intellij.markdown.flavours.MarkdownFlavourDescriptor;
@@ -115,7 +116,7 @@ public class Utils {
         if (StringUtils.isNotEmpty(file)) {
             sb.append("<hr/>");
             sb.append(DocumentationMarkup.DEFINITION_START);
-            sb.append("File: ");
+            sb.append("Reference: ");
             sb.append(createLink(file));
             sb.append(DocumentationMarkup.DEFINITION_END);
         }
@@ -313,7 +314,15 @@ public class Utils {
     }
 
     private static String createLink(String value) {
-        return String.format("<a href='navigate://%s'>%s</a>", value, value);
+        return String.format("<a href='navigate://%s'>%s</a>", value, shortName(value));
+    }
+
+    private static String shortName(String value) {
+        String displayValue = value;
+        if (value.contains(":")) {
+            displayValue = value.replace(".java", "");
+        }
+        return PsiNameHelper.getShortClassName(displayValue);
     }
 
     /**

@@ -5,6 +5,7 @@
     <vendor>vito</vendor>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.java</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow id="Tours Navigation" anchor="right" icon="Icons.LOGO_16"
@@ -43,6 +44,12 @@
                 text="Add Tour Step"
                 description="Set this point a tour step">
             <add-to-group group-id="EditorGutterPopupMenu" anchor="first"/>
+        </action>
+        <action id="org.vito.mycodetour.tours.actions.TourStepGeneratorAction.EditorPopupMenu"
+                class="org.vito.mycodetour.tours.actions.TourStepGeneratorAction"
+                text="Add Tour Step"
+                description="Set this point a tour step">
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
         </action>
     </actions>
 
