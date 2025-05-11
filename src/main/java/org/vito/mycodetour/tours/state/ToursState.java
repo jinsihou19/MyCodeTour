@@ -15,6 +15,7 @@ import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileFilter;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
@@ -155,6 +156,10 @@ public class ToursState {
             tours.addAll(folderTours);
         }
 
+        if (tours.isEmpty()) {
+            tours.addAll(getSpeciseTourList());
+        }
+
         // Sort User Tours. By default, they are sorted base on Title. Otherwise, it follows User Settings
         Comparator<Tour> comparator = Comparator.comparing(Tour::getTitle);
         switch (settings.getSortOption()) {
@@ -195,17 +200,29 @@ public class ToursState {
 
             // 获取所有.tours文件夹下的子文件夹
             for (VirtualFile tourDir : tourDirs) {
-                VfsUtilCore.iterateChildrenRecursively(tourDir, null, fileOrDir -> {
-                    if (fileOrDir.isDirectory()) {
-                        folders.add(new TourFolder(fileOrDir.getName(), fileOrDir));
-                    }
-                    return true;
-                });
+                VfsUtilCore.iterateChildrenRecursively(tourDir,
+                        toursDirFilter(),
+                        fileOrDir -> {
+                            folders.add(new TourFolder(fileOrDir, project));
+                            return true;
+                        });
             }
         } catch (Exception e) {
             LOG.warn("Failed to load folders from index: " + e.getMessage());
         }
         return folders;
+    }
+
+    private static @NotNull VirtualFileFilter toursDirFilter() {
+        return virtualFile -> {
+            if (!virtualFile.isDirectory()) {
+                return false;
+            }
+            if (virtualFile.getName().equals(Props.TOURS_DIR)) {
+                return true;
+            }
+            return !virtualFile.getName().startsWith(".");
+        };
     }
 
     /**
@@ -217,11 +234,9 @@ public class ToursState {
 
         List<TourFolder> folders = new ArrayList<>();
         VfsUtilCore.iterateChildrenRecursively(toursDir.get(),
-                null,
+                toursDirFilter(),
                 fileOrDir -> {
-                    if (fileOrDir.isDirectory()) {
-                        folders.add(new TourFolder(fileOrDir.getName(), fileOrDir));
-                    }
+                    folders.add(new TourFolder(fileOrDir, project));
                     return true;
                 });
         return folders;
@@ -340,10 +355,6 @@ public class ToursState {
         tours = loadTours(project);
     }
 
-    public boolean shouldNotify(Project project) {
-        return true;
-    }
-
     @NotNull
     private List<Tour> getSpeciseTourList() {
         Optional<VirtualFile> userWorkSpace = getToursDir();
@@ -398,7 +409,7 @@ public class ToursState {
                     if (fileOrDir.isDirectory()) {
                         // 如果是文件夹，创建一个TourFolder对象
                         String folderPath = fileOrDir.getPath();
-                        folders.put(folderPath, new TourFolder(fileOrDir.getName(), fileOrDir));
+                        folders.put(folderPath, new TourFolder(fileOrDir, project));
                         folderTours.put(folderPath, new ArrayList<>());
                     } else if (Props.TOUR_EXTENSION.equals(fileOrDir.getExtension())) {
                         // 如果是tour文件，解析它并添加到对应的文件夹中
@@ -442,7 +453,9 @@ public class ToursState {
 
     private Optional<VirtualFile> findTourFile(Tour tour) {
         final Optional<VirtualFile> toursDir = getToursDir();
-        if (toursDir.isEmpty()) return Optional.empty();
+        if (toursDir.isEmpty()) {
+            return Optional.empty();
+        }
 
         final List<VirtualFile> virtualFiles = new ArrayList<>();
         VfsUtilCore.iterateChildrenRecursively(toursDir.get(),

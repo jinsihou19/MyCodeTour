@@ -1,6 +1,5 @@
 package org.vito.mycodetour.tours.ui;
 
-import com.google.gson.Gson;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.dnd.DnDAction;
 import com.intellij.ide.dnd.DnDDragStartBean;
@@ -82,7 +81,6 @@ public class ToolPaneWindow {
     private static final String ID = "Tours Navigation";
     private static final Logger LOG = Logger.getInstance(ToolPaneWindow.class);
     private static final String TREE_TITLE = "Code Tours";
-    private static final Gson GSON = new Gson();
 
     private final JPanel content;
     private final OnePixelSplitter splitter;
@@ -122,7 +120,7 @@ public class ToolPaneWindow {
         project.getMessageBus().connect().subscribe(TourUpdateNotifier.TOPIC, (TourUpdateNotifier) (tour) -> {
             state.reloadState();
             updateToursTree();
-            if (state.getActiveStepIndex() != -1) {
+            if (tour != null && state.getActiveStepIndex() != -1) {
                 Step step = tour.getStep(state.getActiveStepIndex());
                 if (step != null) {
                     createOrUpdateContent(step, project);
@@ -141,7 +139,6 @@ public class ToolPaneWindow {
     }
 
     private void createToursTree() {
-
         final String activeId = StateManager.getInstance().getActiveTour(project).map(Tour::getId).orElse("Null");
 
         treeModel = new DefaultTreeModel(new DefaultMutableTreeNode(TREE_TITLE), false);
@@ -174,7 +171,6 @@ public class ToolPaneWindow {
                 }
                 if (node.getUserObject() instanceof TourFolder) {
                     folderClickListener(e, node);
-                    return;
                 }
             }
         });
@@ -248,8 +244,7 @@ public class ToolPaneWindow {
                 DefaultMutableTreeNode targetNode = (DefaultMutableTreeNode) targetPath.getLastPathComponent();
 
                 // 只允许拖放到Tour节点或Step节点上，但不允许拖放到Demo
-                if (targetNode.getUserObject() instanceof Tour) {
-                    Tour targetTour = (Tour) targetNode.getUserObject();
+                if (targetNode.getUserObject() instanceof Tour targetTour) {
                     if (Validator.isDemo(targetTour)) {
                         event.setDropPossible(false, "Cannot drop into Demo");
                         return false;
@@ -407,7 +402,7 @@ public class ToolPaneWindow {
                         }
                     }
                 }
-                if (nodePath.length() > 0) {
+                if (!nodePath.isEmpty()) {
                     expandedNodePaths.add(nodePath.toString());
                 }
             }
@@ -501,6 +496,9 @@ public class ToolPaneWindow {
                     folderNode.add(tourNode);
                 }
             }
+        }
+        if (hasSingleToursDir) {
+            toursTree.setRootVisible(false);
         }
 
         treeModel.setRoot(root);
