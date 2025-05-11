@@ -497,7 +497,7 @@ public class ToolPaneWindow {
                 }
             }
         }
-        if (hasSingleToursDir) {
+        if (!hasSingleToursDir) {
             toursTree.setRootVisible(false);
         }
 
