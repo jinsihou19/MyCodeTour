@@ -17,6 +17,7 @@ import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.search.FilenameIndex;
+import com.intellij.psi.search.GlobalSearchScope;
 import org.jetbrains.annotations.NotNull;
 import org.vito.mycodetour.tours.domain.OnboardingAssistant;
 import org.vito.mycodetour.tours.domain.Props;
@@ -32,15 +33,15 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.HashMap;
-import java.util.Collection;
 
 /**
  * tour状态，包含读写
@@ -142,7 +143,7 @@ public class ToursState {
         }
 
         // 使用索引查找所有.tour文件夹
-        var tourFolders = loadFoldersFromIndex(project);
+        var tourFolders = loadFoldersFromIndex();
         if (tourFolders.isEmpty()) {
             // 如果索引中没有找到，尝试从文件系统加载
             tourFolders = loadFoldersFromFS();
@@ -182,15 +183,29 @@ public class ToursState {
     /**
      * 从索引中加载所有.tour文件夹
      */
-    private List<TourFolder> loadFoldersFromIndex(@NotNull Project project) {
-        return ReadAction.compute(() -> {
-            // 使用索引查找所有.tour文件夹
-            Collection<VirtualFile> tourDirs = FilenameIndex.getAllFilesByExt(project, Props.TOURS_DIR);
-            return tourDirs.stream()
-                    .filter(VirtualFile::isDirectory)
-                    .map(dir -> new TourFolder(dir.getName(), dir))
-                    .collect(Collectors.toList());
-        });
+    private List<TourFolder> loadFoldersFromIndex() {
+        List<TourFolder> folders = new ArrayList<>();
+        try {
+            // 使用FilenameIndex.getVirtualFilesByName获取所有名为.tours的文件夹
+            Collection<VirtualFile> tourDirs = FilenameIndex
+                    .getVirtualFilesByName(Props.TOURS_DIR, GlobalSearchScope.projectScope(project))
+                    .stream()
+                    .filter(VirtualFile::isDirectory)  // 确保是文件夹
+                    .toList();
+
+            // 获取所有.tours文件夹下的子文件夹
+            for (VirtualFile tourDir : tourDirs) {
+                VfsUtilCore.iterateChildrenRecursively(tourDir, null, fileOrDir -> {
+                    if (fileOrDir.isDirectory()) {
+                        folders.add(new TourFolder(fileOrDir.getName(), fileOrDir));
+                    }
+                    return true;
+                });
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to load folders from index: " + e.getMessage());
+        }
+        return folders;
     }
 
     /**
@@ -564,25 +579,11 @@ public class ToursState {
     }
 
     /**
-     * 获取指定文件夹下的所有tour
-     */
-    public List<Tour> getToursInFolder(TourFolder folder) {
-        if (folder == null) return Collections.emptyList();
-
-        return tours.stream()
-                .filter(tour -> {
-                    VirtualFile tourFile = tour.getVirtualFile();
-                    return tourFile != null && tourFile.getParent().equals(folder.getVirtualFile());
-                })
-                .collect(Collectors.toList());
-    }
-
-    /**
      * 获取所有文件夹
      */
     public List<TourFolder> getFolders() {
         // 优先使用索引查找
-        List<TourFolder> folders = loadFoldersFromIndex(project);
+        List<TourFolder> folders = loadFoldersFromIndex();
         if (folders.isEmpty()) {
             // 如果索引中没有找到，从文件系统加载
             folders = loadFoldersFromFS();
