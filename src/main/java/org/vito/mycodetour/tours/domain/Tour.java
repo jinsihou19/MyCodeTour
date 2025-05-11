@@ -2,6 +2,7 @@ package org.vito.mycodetour.tours.domain;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.intellij.openapi.vfs.VirtualFile;
+import org.jetbrains.annotations.Nullable;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -116,7 +117,11 @@ public class Tour {
      * @param index 索引
      * @return 步骤
      */
+    @Nullable
     public Step getStep(int index) {
+        if(steps == null || index < 0 || index >= steps.size()) {
+            return null;
+        }
         return steps.get(index);
     }
 

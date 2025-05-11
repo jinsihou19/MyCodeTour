@@ -1,11 +1,13 @@
 package org.vito.mycodetour.tours.ui;
 
+import com.intellij.icons.AllIcons;
 import com.intellij.ui.render.LabelBasedRenderer;
 import com.intellij.util.ui.UIUtil;
 import icons.Icons;
 import org.jetbrains.annotations.NotNull;
 import org.vito.mycodetour.tours.domain.Step;
 import org.vito.mycodetour.tours.domain.Tour;
+import org.vito.mycodetour.tours.domain.TourFolder;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -51,12 +53,15 @@ public class TreeRenderer extends LabelBasedRenderer.Tree {
             final Object userObject = node.getUserObject();
 
             // 设置图标
-            if (userObject instanceof Tour) {
-                final Tour tour = (Tour) userObject;
+            if (userObject instanceof Tour tour) {
                 if (tour.getId() != null && tour.getId().equals(selectedTourId))
-                    setIcon(Icons.LOGO_12);
+                    setIcon(Icons.TOUR_16);
+                else
+                    setIcon(Icons.TOUR_OPEN_16);
             } else if (userObject instanceof Step) {
                 setIcon(Icons.STEP_12);
+            } else if (userObject instanceof TourFolder) {
+                setIcon(AllIcons.Nodes.Folder);
             }
 
             // 拖动效果

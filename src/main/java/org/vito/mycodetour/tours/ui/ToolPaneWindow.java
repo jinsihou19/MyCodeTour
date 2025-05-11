@@ -1,5 +1,6 @@
 package org.vito.mycodetour.tours.ui;
 
+import com.google.gson.Gson;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.dnd.DnDAction;
 import com.intellij.ide.dnd.DnDDragStartBean;
@@ -7,6 +8,7 @@ import com.intellij.ide.dnd.DnDEvent;
 import com.intellij.ide.dnd.DnDManager;
 import com.intellij.ide.dnd.DnDSource;
 import com.intellij.ide.dnd.DnDTarget;
+import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
@@ -23,9 +25,11 @@ import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.SlowOperations;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.vito.mycodetour.tours.domain.Props;
 import org.vito.mycodetour.tours.domain.Step;
 import org.vito.mycodetour.tours.domain.Tour;
+import org.vito.mycodetour.tours.domain.TourFolder;
 import org.vito.mycodetour.tours.service.AppSettingsState;
 import org.vito.mycodetour.tours.service.Navigator;
 import org.vito.mycodetour.tours.service.StepRendererPane;
@@ -49,17 +53,21 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
 
 /**
  * Code Tour - Tool Window (Tours Navigation and Management).
@@ -74,6 +82,7 @@ public class ToolPaneWindow {
     private static final String ID = "Tours Navigation";
     private static final Logger LOG = Logger.getInstance(ToolPaneWindow.class);
     private static final String TREE_TITLE = "Code Tours";
+    private static final Gson GSON = new Gson();
 
     private final JPanel content;
     private final OnePixelSplitter splitter;
@@ -114,7 +123,10 @@ public class ToolPaneWindow {
             state.reloadState();
             updateToursTree();
             if (state.getActiveStepIndex() != -1) {
-                createOrUpdateContent(tour.getStep(state.getActiveStepIndex()), project);
+                Step step = tour.getStep(state.getActiveStepIndex());
+                if (step != null) {
+                    createOrUpdateContent(step, project);
+                }
             }
         });
 
@@ -146,7 +158,6 @@ public class ToolPaneWindow {
                     return;
                 }
 
-
                 if (!(pathSelected.getLastPathComponent() instanceof DefaultMutableTreeNode)) return;
                 final DefaultMutableTreeNode node = (DefaultMutableTreeNode) pathSelected.getLastPathComponent();
                 if (node.getUserObject() instanceof String && TREE_TITLE.equals(node.getUserObject().toString())) {
@@ -159,6 +170,11 @@ public class ToolPaneWindow {
                 }
                 if (node.getUserObject() instanceof Step) {
                     stepClickListener(e, node, project);
+                    return;
+                }
+                if (node.getUserObject() instanceof TourFolder) {
+                    folderClickListener(e, node);
+                    return;
                 }
             }
         });
@@ -369,43 +385,155 @@ public class ToolPaneWindow {
      * 更新指南树数据
      */
     public void updateToursTree() {
-        // 保存当前展开的节点
-        Set<String> expandedTourTitles = new HashSet<>();
+        // 保存当前展开的节点路径
+        Set<String> expandedNodePaths = new HashSet<>();
         for (int i = 0; i < toursTree.getRowCount(); i++) {
             TreePath path = toursTree.getPathForRow(i);
             if (toursTree.isExpanded(path)) {
-                Object lastComponent = path.getLastPathComponent();
-                if (lastComponent instanceof DefaultMutableTreeNode) {
-                    Object userObject = ((DefaultMutableTreeNode) lastComponent).getUserObject();
-                    if (userObject instanceof Tour) {
-                        expandedTourTitles.add(((Tour) userObject).getTitle());
+                StringBuilder nodePath = new StringBuilder();
+                for (int j = 0; j < path.getPathCount(); j++) {
+                    Object component = path.getPathComponent(j);
+                    if (component instanceof DefaultMutableTreeNode) {
+                        Object userObject = ((DefaultMutableTreeNode) component).getUserObject();
+                        if (userObject instanceof Tour) {
+                            nodePath.append(((Tour) userObject).getVirtualFile().getPath());
+                        } else if (userObject instanceof TourFolder) {
+                            nodePath.append(((TourFolder) userObject).getVirtualFile().getPath());
+                        } else if (j == 0 && userObject instanceof String && TREE_TITLE.equals(userObject)) {
+                            nodePath.append(TREE_TITLE);
+                        }
+                        if (j < path.getPathCount() - 1) {
+                            nodePath.append("/");
+                        }
                     }
+                }
+                if (nodePath.length() > 0) {
+                    expandedNodePaths.add(nodePath.toString());
                 }
             }
         }
 
-        final List<Tour> tours = StateManager.getInstance().getState(project).getTours();
+        final ToursState state = StateManager.getInstance().getState(project);
         final DefaultMutableTreeNode root = new DefaultMutableTreeNode(TREE_TITLE);
-        tours.forEach(tour -> {
-            DefaultMutableTreeNode aTourNode = new DefaultMutableTreeNode(tour);
-            LOG.info(String.format("Rendering Tour '%s' with %s steps%n", tour.getTitle(), tour.getSteps().size()));
-            tour.getSteps().forEach(step -> aTourNode.add(new DefaultMutableTreeNode(step)));
-            root.add(aTourNode);
-        });
+
+        // 1. 获取所有文件夹，并按路径排序（确保父文件夹在前）
+        List<TourFolder> allFolders = state.getFolders();
+        allFolders.sort(Comparator.comparing(folder -> folder.getVirtualFile().getPath()));
+
+        // 2. 统计.tours文件夹的数量和找到唯一的.tours文件夹
+        List<TourFolder> toursDirs = allFolders.stream()
+                .filter(folder -> folder.getVirtualFile().getName().equals(Props.TOURS_DIR))
+                .toList();
+        boolean hasSingleToursDir = toursDirs.size() == 1;
+        TourFolder singleToursDir = hasSingleToursDir ? toursDirs.get(0) : null;
+
+        // 3. 创建文件夹节点映射，用于快速查找父节点
+        Map<String, DefaultMutableTreeNode> folderNodes = new HashMap<>();
+
+        // 4. 按层级关系创建文件夹节点
+        for (TourFolder folder : allFolders) {
+            VirtualFile folderFile = folder.getVirtualFile();
+            String folderPath = folderFile.getPath();
+            VirtualFile parentDir = folderFile.getParent();
+
+            // 如果是唯一的.tours文件夹，跳过它
+            if (hasSingleToursDir && folder.equals(singleToursDir)) {
+                continue;
+            }
+
+            // 创建当前文件夹节点
+            DefaultMutableTreeNode folderNode = new DefaultMutableTreeNode(folder);
+
+            // 找到父节点并添加当前节点
+            if (parentDir != null) {
+                String parentPath = parentDir.getPath();
+                DefaultMutableTreeNode parentNode = folderNodes.get(parentPath);
+
+                // 如果有父节点，添加到父节点下
+                // 如果找不到父节点，说明是根目录下的文件夹
+                if (hasSingleToursDir && parentDir.equals(singleToursDir.getVirtualFile())) {
+                    // 如果父目录是唯一的.tours文件夹，直接添加到根节点
+                    root.add(folderNode);
+                } else Objects.requireNonNullElse(parentNode, root).add(folderNode);
+            } else {
+                // 如果没有父目录，说明是根目录
+                root.add(folderNode);
+            }
+
+            // 将当前节点添加到映射中
+            folderNodes.put(folderPath, folderNode);
+        }
+
+        // 5. 获取所有tour并按文件夹分组
+        Map<TourFolder, List<Tour>> folderToursMap = new HashMap<>();
+        for (Tour tour : state.getTours()) {
+            VirtualFile tourFile = tour.getVirtualFile();
+            if (tourFile != null) {
+                VirtualFile parentDir = tourFile.getParent();
+                if (parentDir != null) {
+                    // 如果父目录是唯一的.tours文件夹，直接添加到根节点
+                    if (hasSingleToursDir && parentDir.equals(singleToursDir.getVirtualFile())) {
+                        DefaultMutableTreeNode tourNode = new DefaultMutableTreeNode(tour);
+                        tour.getSteps().forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
+                        root.add(tourNode);
+                        continue;
+                    }
+
+                    allFolders.stream()
+                            .filter(f -> f.getVirtualFile().equals(parentDir))
+                            .findFirst().ifPresent(parentFolder ->
+                                    folderToursMap.computeIfAbsent(parentFolder, k -> new ArrayList<>()).add(tour));
+
+                }
+            }
+        }
+
+        // 6. 将tour添加到对应的文件夹节点下
+        for (Map.Entry<TourFolder, List<Tour>> entry : folderToursMap.entrySet()) {
+            TourFolder folder = entry.getKey();
+            List<Tour> folderTours = entry.getValue();
+
+            DefaultMutableTreeNode folderNode = folderNodes.get(folder.getVirtualFile().getPath());
+            if (folderNode != null) {
+                for (Tour tour : folderTours) {
+                    DefaultMutableTreeNode tourNode = new DefaultMutableTreeNode(tour);
+                    tour.getSteps().forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
+                    folderNode.add(tourNode);
+                }
+            }
+        }
+
         treeModel.setRoot(root);
         treeModel.reload();
 
         // 恢复展开状态
-        for (int i = 0; i < root.getChildCount(); i++) {
-            DefaultMutableTreeNode node = (DefaultMutableTreeNode) root.getChildAt(i);
-            if (node.getUserObject() instanceof Tour tour) {
-                if (expandedTourTitles.contains(tour.getTitle())) {
-                    toursTree.expandPath(new TreePath(node.getPath()));
-                }
-            }
-        }
+        restoreExpandedState(root, expandedNodePaths, "");
     }
 
+    private void restoreExpandedState(DefaultMutableTreeNode node, Set<String> expandedPaths, String currentPath) {
+        Object userObject = node.getUserObject();
+        String nodePath;
+
+        if (userObject instanceof Tour) {
+            nodePath = currentPath + ((Tour) userObject).getVirtualFile().getPath();
+        } else if (userObject instanceof TourFolder) {
+            nodePath = currentPath + ((TourFolder) userObject).getVirtualFile().getPath();
+        } else if (userObject instanceof String && TREE_TITLE.equals(userObject)) {
+            nodePath = TREE_TITLE;
+        } else {
+            return;
+        }
+
+        if (expandedPaths.contains(nodePath)) {
+            toursTree.expandPath(new TreePath(node.getPath()));
+        }
+
+        // 递归处理子节点
+        for (int i = 0; i < node.getChildCount(); i++) {
+            DefaultMutableTreeNode child = (DefaultMutableTreeNode) node.getChildAt(i);
+            restoreExpandedState(child, expandedPaths, nodePath + "/");
+        }
+    }
 
     private void createOrUpdateContent(@NotNull Step step, @NotNull Project project) {
         StepRendererPane pane = new StepRendererPane(step, project);
@@ -460,6 +588,10 @@ public class ToolPaneWindow {
             final JMenuItem newTourAction = new JMenuItem("Create New Tour", AllIcons.Actions.AddFile);
             newTourAction.addActionListener(d -> createNewTourListener());
 
+            // Create new Folder
+            final JMenuItem newFolderAction = new JMenuItem("Create New Folder", AllIcons.Actions.NewFolder);
+            newFolderAction.addActionListener(d -> createNewFolderListener(null));
+
             // Enable/Disable Demo
             final String title = String.format("%s Demo",
                     AppSettingsState.getInstance().isOnboardingAssistantOn() ? "Disable" : "Enable");
@@ -472,7 +604,7 @@ public class ToolPaneWindow {
                 reloadToursState();
             });
 
-            Arrays.asList(newTourAction, toggleOnboardTourAction).forEach(menu::add);
+            Arrays.asList(newTourAction, newFolderAction, toggleOnboardTourAction).forEach(menu::add);
             menu.show(toursTree, e.getX(), e.getY());
         }
     }
@@ -567,9 +699,40 @@ public class ToolPaneWindow {
             StateManager.getInstance().getState(project).setActiveStepIndex(index);
         Navigator.navigateLine(step, project, this::createOrUpdateContent);
     }
+
+    private void folderClickListener(MouseEvent e, DefaultMutableTreeNode node) {
+        if (e.getButton() == MouseEvent.BUTTON3) {
+            final JBPopupMenu menu = new JBPopupMenu("Folder Context Menu");
+
+            // 创建新Tour的选项
+            final JMenuItem newTourAction = new JMenuItem("Create New Tour", AllIcons.Actions.AddFile);
+            newTourAction.addActionListener(d -> createNewTourInFolderListener((TourFolder) node.getUserObject()));
+
+            // 创建新文件夹的选项
+            final JMenuItem newFolderAction = new JMenuItem("Create New Folder", AllIcons.Actions.NewFolder);
+            newFolderAction.addActionListener(d -> createNewFolderListener((TourFolder) node.getUserObject()));
+
+            menu.add(newTourAction);
+            menu.add(newFolderAction);
+            menu.show(toursTree, e.getX(), e.getY());
+        }
+    }
     //endregion
 
     private void createNewTourListener() {
+        final Tour newTour = createNewTour();
+        if (newTour == null) {
+            return; // i.e. hit cancel
+        }
+
+        StateManager.getInstance().getState(project).createTour(project, newTour);
+        project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(newTour);
+        CodeTourNotifier.notifyTourAction(project, newTour, "Creation",
+                String.format("Tour '%s' (file %s) has been created", newTour.getTitle(), newTour.getTourFile()));
+
+    }
+
+    private @Nullable Tour createNewTour() {
         final Tour newTour = Tour.builder()
                 .id(UUID.randomUUID().toString())
                 .tourFile("newTour" + Props.TOUR_EXTENSION_FULL)
@@ -587,7 +750,7 @@ public class ToolPaneWindow {
                 "Input the title of the new Tour (should be unique)",
                 "New Tour", AllIcons.Actions.NewFolder, newTour.getTitle(),
                 new TourValidator(title -> StringUtils.isNotEmpty(title) && !tourTitles.contains(title)));
-        if (updatedTitle == null) return; // i.e. hit cancel
+        if (updatedTitle == null) return null;
         newTour.setTitle(updatedTitle);
 
 
@@ -600,14 +763,57 @@ public class ToolPaneWindow {
                 "New Tour", AllIcons.Actions.NewFolder, Utils.fileNameFromTitle(newTour.getTitle()),
                 new TourValidator(fileName -> StringUtils.isNotEmpty(fileName) &&
                         fileName.endsWith(Props.TOUR_EXTENSION_FULL) && !tourFiles.contains(fileName)));
-        if (updatedFilename == null) return; // i.e. hit cancel
+        if (updatedFilename == null) return null;
         newTour.setTourFile(updatedFilename);
+        return newTour;
+    }
 
-        StateManager.getInstance().getState(project).createTour(project, newTour);
-        project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(newTour);
-        CodeTourNotifier.notifyTourAction(project, newTour, "Creation",
-                String.format("Tour '%s' (file %s) has been created", newTour.getTitle(), newTour.getTourFile()));
+    private void createNewFolderListener(TourFolder parentFolder) {
+        // 获取所有现有文件夹名称
+        final Set<String> existingFolders = StateManager.getInstance().getState(project).getFolders().stream()
+                .map(folder -> folder.getVirtualFile().getName())
+                .collect(Collectors.toSet());
 
+        // 交互式创建文件夹名称
+        final String folderName = Messages.showInputDialog(project,
+                "Input the name of the new folder",
+                "New Folder", AllIcons.Actions.NewFolder, "NewFolder",
+                new TourValidator(name -> StringUtils.isNotEmpty(name) && !existingFolders.contains(name)));
+        if (folderName == null) return; // 即点击取消
+
+        try {
+            // 确定父目录
+            VirtualFile parentDir;
+            if (parentFolder != null) {
+                parentDir = parentFolder.getVirtualFile();
+            } else {
+                // 如果是根节点，使用第一个.tours文件夹
+                List<TourFolder> toursDirs = StateManager.getInstance().getState(project).getFolders().stream()
+                        .filter(folder -> folder.getVirtualFile().getName().equals(Props.TOURS_DIR))
+                        .collect(Collectors.toList());
+                if (toursDirs.isEmpty()) {
+                    CodeTourNotifier.error(project, "Cannot find .tours directory");
+                    return;
+                }
+                parentDir = toursDirs.get(0).getVirtualFile();
+            }
+
+            // 创建文件夹
+            WriteAction.runAndWait(() -> {
+                try {
+                    VirtualFile newFolder = parentDir.createChildDirectory(this, folderName);
+                    // 刷新状态
+                    StateManager.getInstance().getState(project).reloadState();
+                    updateToursTree();
+                    CodeTourNotifier.notifyTourAction(project, null, "Folder Creation",
+                            String.format("Folder '%s' has been created", folderName));
+                } catch (IOException ex) {
+                    CodeTourNotifier.error(project, "Failed to create folder: " + ex.getMessage());
+                }
+            });
+        } catch (Exception ex) {
+            CodeTourNotifier.error(project, "Failed to create folder: " + ex.getMessage());
+        }
     }
 
     //region Tour Context menu actions
@@ -796,5 +1002,17 @@ public class ToolPaneWindow {
         StateManager.getInstance().getState(project).reloadState();
         updateActiveTour(null); // reset the activeTour
         updateToursTree();
+    }
+
+    private void createNewTourInFolderListener(TourFolder folder) {
+        final Tour newTour = createNewTour();
+        if (newTour == null) {
+            return; // 即点击取消
+        }
+
+        StateManager.getInstance().getState(project).createTour(project, newTour, folder.getVirtualFile());
+        project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(newTour);
+        CodeTourNotifier.notifyTourAction(project, newTour, "Creation",
+                String.format("Tour '%s' (file %s) has been created", newTour.getTitle(), newTour.getTourFile()));
     }
 }

@@ -22,6 +22,7 @@ import org.vito.mycodetour.tours.domain.OnboardingAssistant;
 import org.vito.mycodetour.tours.domain.Props;
 import org.vito.mycodetour.tours.domain.Step;
 import org.vito.mycodetour.tours.domain.Tour;
+import org.vito.mycodetour.tours.domain.TourFolder;
 import org.vito.mycodetour.tours.service.AppSettingsState;
 
 import java.io.File;
@@ -34,9 +35,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Collection;
 
 /**
  * tour状态，包含读写
@@ -137,11 +141,17 @@ public class ToursState {
                 tours.add(onboardingTour);
         }
 
-        // 只通过索引找所有的指南文件
-        var userTours = loadFromIndex(project);
-        if (userTours.isEmpty()) {
-            // 通过猜测工程再找一次
-            userTours = new ArrayList<>(getSpeciseTourList());
+        // 使用索引查找所有.tour文件夹
+        var tourFolders = loadFoldersFromIndex(project);
+        if (tourFolders.isEmpty()) {
+            // 如果索引中没有找到，尝试从文件系统加载
+            tourFolders = loadFoldersFromFS();
+        }
+
+        // 从每个文件夹中加载tour文件
+        for (TourFolder folder : tourFolders) {
+            var folderTours = loadToursFromFolder(folder);
+            tours.addAll(folderTours);
         }
 
         // Sort User Tours. By default, they are sorted base on Title. Otherwise, it follows User Settings
@@ -154,9 +164,8 @@ public class ToursState {
         if (AppSettingsState.SortDirectionE.DESC.equals(settings.getSortDirection()))
             comparator = comparator.reversed(); // ASC,DESC
         LOG.info("Sorting Tours using: %s - %s".formatted(settings.getSortOption(), settings.getSortDirection()));
-        userTours.sort(comparator);
+        tours.sort(comparator);
 
-        tours.addAll(userTours);
         // Cache some info
         updateLinesCache(tours);
 
@@ -170,6 +179,59 @@ public class ToursState {
         return tours;
     }
 
+    /**
+     * 从索引中加载所有.tour文件夹
+     */
+    private List<TourFolder> loadFoldersFromIndex(@NotNull Project project) {
+        return ReadAction.compute(() -> {
+            // 使用索引查找所有.tour文件夹
+            Collection<VirtualFile> tourDirs = FilenameIndex.getAllFilesByExt(project, Props.TOURS_DIR);
+            return tourDirs.stream()
+                    .filter(VirtualFile::isDirectory)
+                    .map(dir -> new TourFolder(dir.getName(), dir))
+                    .collect(Collectors.toList());
+        });
+    }
+
+    /**
+     * 从文件系统加载所有.tour文件夹
+     */
+    private List<TourFolder> loadFoldersFromFS() {
+        Optional<VirtualFile> toursDir = getToursDir();
+        if (toursDir.isEmpty()) return Collections.emptyList();
+
+        List<TourFolder> folders = new ArrayList<>();
+        VfsUtilCore.iterateChildrenRecursively(toursDir.get(),
+                null,
+                fileOrDir -> {
+                    if (fileOrDir.isDirectory()) {
+                        folders.add(new TourFolder(fileOrDir.getName(), fileOrDir));
+                    }
+                    return true;
+                });
+        return folders;
+    }
+
+    /**
+     * 从指定文件夹加载所有tour文件
+     */
+    private List<Tour> loadToursFromFolder(TourFolder folder) {
+        List<Tour> folderTours = new ArrayList<>();
+        VirtualFile folderFile = folder.getVirtualFile();
+
+        // 遍历文件夹中的所有文件
+        for (VirtualFile file : folderFile.getChildren()) {
+            if (!file.isDirectory() && Props.TOUR_EXTENSION.equals(file.getExtension())) {
+                parse(file).ifPresent(tour -> {
+                    tour.setVirtualFile(file);
+                    folderTours.add(tour);
+                });
+            }
+        }
+
+        return folderTours;
+    }
+
     private void updateLinesCache(List<Tour> tours) {
         stepFileLinesIndex.clear();
         tours.forEach(tour -> stepFileLinesIndex.putAll(tour.getStepIndexes()));
@@ -179,6 +241,13 @@ public class ToursState {
      * Persists the provided Tour to filesystem
      */
     public Tour createTour(Project project, Tour tour) {
+        return createTour(project, tour, getToursDir().orElse(null));
+    }
+
+    /**
+     * Persists the provided Tour to filesystem
+     */
+    public Tour createTour(Project project, Tour tour, VirtualFile directory) {
         if (project.getBasePath() == null) return null;
         final String fileName = tour.getTourFile();
 
@@ -188,17 +257,19 @@ public class ToursState {
                 tour.getTitle(), tour.getSteps().size(), fileName));
 
         WriteAction.runAndWait(() -> {
-            Optional<VirtualFile> toursDir = getToursDir();
-            if (toursDir.isEmpty()) {
-                toursDir = createToursDir();
+            VirtualFile parent = directory;
+            if (parent == null) {
+                Optional<VirtualFile> toursDir = createToursDir();
                 if (toursDir.isEmpty()) {
                     throw new PluginException("Could not find or creat '.tours' directory. Tour creation failed",
                             PluginId.findId("org.vito.mycodetour"));
+                } else {
+                    parent = toursDir.get();
                 }
             }
             // Persist the file
             try {
-                final VirtualFile newTourVfile = toursDir.get().createChildData(this, fileName);
+                final VirtualFile newTourVfile = parent.createChildData(this, fileName);
                 tour.setVirtualFile(newTourVfile);
                 newTourVfile.setBinaryContent(GSON.toJson(tour).getBytes(StandardCharsets.UTF_8));
                 setActiveTour(tour);
@@ -258,7 +329,6 @@ public class ToursState {
         return true;
     }
 
-
     @NotNull
     private List<Tour> getSpeciseTourList() {
         Optional<VirtualFile> userWorkSpace = getToursDir();
@@ -303,13 +373,41 @@ public class ToursState {
         final Optional<VirtualFile> toursDir = getToursDir();
         if (toursDir.isEmpty()) return new ArrayList<>();
 
+        // 使用Map来存储文件夹结构
+        Map<String, List<Tour>> folderTours = new HashMap<>();
+        Map<String, TourFolder> folders = new HashMap<>();
+
         VfsUtilCore.iterateChildrenRecursively(toursDir.get(),
                 null,
                 fileOrDir -> {
-                    if (!fileOrDir.isDirectory() && Props.TOUR_EXTENSION.equals(fileOrDir.getExtension()))
-                        parse(fileOrDir).ifPresent(tours::add);
+                    if (fileOrDir.isDirectory()) {
+                        // 如果是文件夹，创建一个TourFolder对象
+                        String folderPath = fileOrDir.getPath();
+                        folders.put(folderPath, new TourFolder(fileOrDir.getName(), fileOrDir));
+                        folderTours.put(folderPath, new ArrayList<>());
+                    } else if (Props.TOUR_EXTENSION.equals(fileOrDir.getExtension())) {
+                        // 如果是tour文件，解析它并添加到对应的文件夹中
+                        parse(fileOrDir).ifPresent(tour -> {
+                            String parentPath = fileOrDir.getParent().getPath();
+                            if (parentPath.equals(toursDir.get().getPath())) {
+                                // 如果父目录是.tours，直接添加到根目录
+                                tours.add(tour);
+                            } else {
+                                // 否则添加到对应的文件夹中
+                                folderTours.computeIfAbsent(parentPath, k -> new ArrayList<>()).add(tour);
+                            }
+                        });
+                    }
                     return true;
                 });
+
+        // 将文件夹中的tour添加到结果列表中
+        for (Map.Entry<String, List<Tour>> entry : folderTours.entrySet()) {
+            if (!entry.getKey().equals(toursDir.get().getPath())) {
+                tours.addAll(entry.getValue());
+            }
+        }
+
         return tours;
     }
 
@@ -463,6 +561,33 @@ public class ToursState {
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * 获取指定文件夹下的所有tour
+     */
+    public List<Tour> getToursInFolder(TourFolder folder) {
+        if (folder == null) return Collections.emptyList();
+
+        return tours.stream()
+                .filter(tour -> {
+                    VirtualFile tourFile = tour.getVirtualFile();
+                    return tourFile != null && tourFile.getParent().equals(folder.getVirtualFile());
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取所有文件夹
+     */
+    public List<TourFolder> getFolders() {
+        // 优先使用索引查找
+        List<TourFolder> folders = loadFoldersFromIndex(project);
+        if (folders.isEmpty()) {
+            // 如果索引中没有找到，从文件系统加载
+            folders = loadFoldersFromFS();
+        }
+        return folders;
     }
 
 }

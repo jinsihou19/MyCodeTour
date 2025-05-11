@@ -8,7 +8,7 @@
     <depends>com.intellij.java</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="Tours Navigation" anchor="right" icon="Icons.LOGO_16"
+        <toolWindow id="Tours Navigation" anchor="right" icon="Icons.TOUR_16"
                     factoryClass="org.vito.mycodetour.tours.ui.ToolPaneWindowFactory"/>
         <notificationGroup id="CodeTour-Notification" displayType="BALLOON"/>
         <codeInsight.lineMarkerProvider language=""
@@ -25,7 +25,7 @@
 
     <actions>
         <group id="CodeTourGroupedActions" text="Code Tour" description="Code Tour related actions"
-               popup="true" icon="Icons.LOGO_16">
+               popup="true" icon="Icons.TOUR_16">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <action id="PrevStepNav" class="org.vito.mycodetour.tours.actions.NavigatePrevStepAction"
                     text="Previous Step" description="Navigate to the Previous Step"

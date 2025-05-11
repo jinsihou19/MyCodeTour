@@ -22,7 +22,7 @@ public class CodeTourNotifier {
       NotificationGroupManager.getInstance()
             .getNotificationGroup("CodeTour-Notification")
             .createNotification(content, NotificationType.INFORMATION)
-            .setIcon(Icons.LOGO_16)
+            .setIcon(Icons.TOUR_16)
             .notify(project);
       LOG.info("CodeTourNotifier: " + content);
    }
@@ -31,7 +31,7 @@ public class CodeTourNotifier {
       NotificationGroupManager.getInstance()
             .getNotificationGroup("CodeTour-Notification")
             .createNotification("Tour action: " + action, content, NotificationType.INFORMATION)
-            .setIcon(Icons.LOGO_16)
+            .setIcon(Icons.TOUR_16)
             .notify(project);
       LOG.info("CodeTourNotifier: " + content);
    }
@@ -40,7 +40,7 @@ public class CodeTourNotifier {
       NotificationGroupManager.getInstance()
             .getNotificationGroup("CodeTour-Notification")
             .createNotification(content, NotificationType.WARNING)
-            .setIcon(Icons.LOGO_16)
+            .setIcon(Icons.TOUR_16)
             .notify(project);
       LOG.warn("CodeTourNotifier: " + content);
    }
@@ -49,7 +49,7 @@ public class CodeTourNotifier {
       NotificationGroupManager.getInstance()
             .getNotificationGroup("CodeTour-Notification")
             .createNotification(content, NotificationType.ERROR)
-            .setIcon(Icons.LOGO_16)
+            .setIcon(Icons.TOUR_16)
             .notify(project);
       LOG.error("CodeTourNotifier: " + content);
    }
