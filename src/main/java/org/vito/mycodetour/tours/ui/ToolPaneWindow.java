@@ -497,10 +497,8 @@ public class ToolPaneWindow {
                 }
             }
         }
-        if (!hasSingleToursDir) {
-            toursTree.setRootVisible(false);
-        }
 
+        toursTree.setRootVisible(hasSingleToursDir);
         treeModel.setRoot(root);
         treeModel.reload();
 
