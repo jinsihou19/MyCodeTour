@@ -16,19 +16,14 @@ public class Step {
     private Integer line;
     private String directory;
     private String uri;
-    private String pattern;
 
     public Step() {
     }
 
-    public Step(String description, String file, String directory, String uri, Integer line, String pattern,
-                String title) {
+    public Step(String description, String file, Integer line, String title) {
         this.description = description;
         this.file = file;
-        this.directory = directory;
-        this.uri = uri;
         this.line = line;
-        this.pattern = pattern;
         this.title = title;
     }
 
@@ -70,29 +65,6 @@ public class Step {
 
     public String getDirectory() {
         return directory;
-    }
-
-    public Step setDirectory(String directory) {
-        this.directory = directory;
-        return this;
-    }
-
-    public String getUri() {
-        return uri;
-    }
-
-    public Step setUri(String uri) {
-        this.uri = uri;
-        return this;
-    }
-
-    public String getPattern() {
-        return pattern;
-    }
-
-    public Step setPattern(String pattern) {
-        this.pattern = pattern;
-        return this;
     }
 
     public String reference() {
@@ -156,9 +128,6 @@ public class Step {
         private String description;
         private String file;
         private Integer line;
-        private String directory;
-        private String uri;
-        private String pattern;
 
         private StepBuilder() {
         }
@@ -183,23 +152,8 @@ public class Step {
             return this;
         }
 
-        public StepBuilder directory(String directory) {
-            this.directory = directory;
-            return this;
-        }
-
-        public StepBuilder uri(String uri) {
-            this.uri = uri;
-            return this;
-        }
-
-        public StepBuilder pattern(String pattern) {
-            this.pattern = pattern;
-            return this;
-        }
-
         public Step build() {
-            return new Step(description, file, directory, uri, line, pattern, title);
+            return new Step(description, file, line, title);
         }
     }
 }

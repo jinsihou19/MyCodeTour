@@ -12,6 +12,7 @@ import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiField;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiIdentifier;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
@@ -56,24 +57,15 @@ public class TourStepGeneratorAction extends AnAction {
         int offset = editor.getCaretModel().getOffset();
         PsiElement element = psiFile.findElementAt(offset);
         PsiElement parent = PsiTreeUtil.getParentOfType(element, PsiClass.class, PsiField.class, PsiMethod.class);
-        if (parent == null) {
-            return;
-        }
 
         Step step;
-        if (parent.equals(element.getContext())) {
-            String reference = null;
-            if (parent instanceof PsiClass psiClass) {
-                reference = psiClass.getQualifiedName();
-            } else if (parent instanceof PsiMethod psiMethod) {
-                reference = PsiHelper.buildMethodReference(psiMethod);
-            } else if (parent instanceof PsiField psiField) {
-                reference = PsiHelper.buildFieldReference(psiField);
-            }
-            step = Step.with(reference);
+        if (element instanceof PsiIdentifier
+                && element.getContext() != null
+                && element.getContext().equals(parent)) {
+            step = Step.with(PsiHelper.getReference(parent));
         } else {
             LogicalPosition logicalPosition = editor.getCaretModel().getLogicalPosition();
-            final int line = logicalPosition.line;
+            final int line = logicalPosition.line + 1;
 
             final VirtualFile virtualFile = e.getData(CommonDataKeys.VIRTUAL_FILE);
             if (virtualFile == null) {

@@ -65,6 +65,7 @@ public class ToursState {
     private static LocalDateTime lastValidationTime = LocalDateTime.now().minusHours(2);
     // Caching
     private final Multimap<String, Integer> stepFileLinesIndex = ArrayListMultimap.create();
+    private final Multimap<String, String> stepIdentifiersIndex = ArrayListMultimap.create();
 
     public ToursState(Project project) {
         this.project = project;
@@ -106,20 +107,8 @@ public class ToursState {
         return this;
     }
 
-    public static LocalDateTime getLastValidationTime() {
-        return lastValidationTime;
-    }
-
-    public void setLastValidationTime(LocalDateTime lastValidationTime) {
-        ToursState.lastValidationTime = lastValidationTime;
-    }
-
-    public boolean isFileIncludedInAnyStep(String fileName) {
-        return stepFileLinesIndex.containsKey(fileName);
-    }
-
-    public boolean isValidStep(String fileName, Integer line) {
-        return stepFileLinesIndex.get(fileName).contains(line);
+    public boolean isValidStep(String identifier) {
+        return stepIdentifiersIndex.containsValue(identifier);
     }
 
     public String getStepMetaLabel(String stepTitle) {
@@ -264,7 +253,18 @@ public class ToursState {
 
     private void updateLinesCache(List<Tour> tours) {
         stepFileLinesIndex.clear();
-        tours.forEach(tour -> stepFileLinesIndex.putAll(tour.getStepIndexes()));
+        stepIdentifiersIndex.clear();
+        tours.forEach(tour -> {
+            // 更新文件行号索引
+            stepFileLinesIndex.putAll(tour.getStepIndexes());
+            // 更新标识符索引
+            tour.getSteps().forEach(step -> {
+                String reference = step.reference();
+                if (reference != null && !reference.isEmpty() && step.getFile() != null) {
+                    stepIdentifiersIndex.put(step.getFile(), reference);
+                }
+            });
+        });
     }
 
     /**
@@ -602,6 +602,28 @@ public class ToursState {
             folders = loadFoldersFromFS();
         }
         return folders;
+    }
+
+    public Optional<Step> findStepByReference(String reference) {
+        final Optional<Tour> tourToActivate = getTours().stream()
+                .filter(tour -> tour.getSteps().stream()
+                        .anyMatch(step -> reference.equals(step.reference())))
+                .findFirst();
+        if (tourToActivate.isEmpty()) {
+            return Optional.empty();
+        }
+        setActiveTour(tourToActivate.get());
+
+        final List<Step> steps = tourToActivate.get().getSteps();
+        for (int i = 0; i < steps.size(); i++) {
+            final Step step = steps.get(i);
+            if (reference.equals(step.reference())) {
+                setActiveStepIndex(i);
+                return Optional.of(step);
+            }
+        }
+
+        return Optional.empty();
     }
 
 }
