@@ -394,7 +394,7 @@ public class ToolPaneWindow {
                             nodePath.append(((Tour) userObject).getVirtualFile().getPath());
                         } else if (userObject instanceof TourFolder) {
                             nodePath.append(((TourFolder) userObject).getVirtualFile().getPath());
-                        } else if (j == 0 && userObject instanceof String && TREE_TITLE.equals(userObject)) {
+                        } else if (j == 0 && TREE_TITLE.equals(userObject)) {
                             nodePath.append(TREE_TITLE);
                         }
                         if (j < path.getPathCount() - 1) {
@@ -498,7 +498,7 @@ public class ToolPaneWindow {
             }
         }
 
-        toursTree.setRootVisible(hasSingleToursDir);
+        toursTree.setRootVisible(toursDirs.size() <= 1);
         treeModel.setRoot(root);
         treeModel.reload();
 

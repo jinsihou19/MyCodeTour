@@ -165,11 +165,12 @@ public class ToursState {
         updateLinesCache(tours);
 
         // Validate them at most once in an hour
-        final LocalDateTime now = LocalDateTime.now();
-        if (now.isAfter(lastValidationTime.plusHours(1))) {
-            Validator.validateTours(project, tours);
-            lastValidationTime = now;
-        }
+        // 禁用检测
+//        final LocalDateTime now = LocalDateTime.now();
+//        if (now.isAfter(lastValidationTime.plusHours(1))) {
+//            Validator.validateTours(project, tours);
+//            lastValidationTime = now;
+//        }
 
         return tours;
     }
