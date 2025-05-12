@@ -42,37 +42,43 @@ public class ResourceHandler implements CefResourceHandler {
         }
 
         // 解析URL路径（例如 "myapp:///html/index.html"）
-        String resourcePath = url.replace("file:///", "");
 
-        // 从类路径加载资源
-//        inputStream = getClass().getResourceAsStream(resourcePath);
-        VirtualFile resourceFile = VirtualFileManager.getInstance().findFileByNioPath(new File(project.getBasePath() + "/" + resourcePath).toPath());
-        if (resourceFile == null) {
-            return false;
-        }
-        try {
-            inputStream = resourceFile.getInputStream();
-        } catch (IOException e) {
-            LOG.error(e);
-            return false;
+        if (url.startsWith("file:///mycodetour/")) {
+            String resourcePath = url.replace("file:///mycodetour", "");
+            inputStream = getClass().getResourceAsStream(resourcePath);
+            if (inputStream == null) {
+                return false;
+            }
+        } else {
+            String resourcePath = url.replace("file:///", "");
+            VirtualFile resourceFile = VirtualFileManager.getInstance().findFileByNioPath(new File(project.getBasePath() + "/" + resourcePath).toPath());
+            if (resourceFile == null) {
+                return false;
+            }
+            try {
+                inputStream = resourceFile.getInputStream();
+            } catch (IOException e) {
+                LOG.error(e);
+                return false;
+            }
         }
 
         // 根据文件后缀设置MIME类型
-        if (resourcePath.endsWith(".html")) {
+        if (url.endsWith(".html")) {
             mimeType = "text/html";
-        } else if (resourcePath.endsWith(".css")) {
+        } else if (url.endsWith(".css")) {
             mimeType = "text/css";
-        } else if (resourcePath.endsWith(".js")) {
+        } else if (url.endsWith(".js")) {
             mimeType = "application/javascript";
-        } else if (resourcePath.endsWith(".png")) {
+        } else if (url.endsWith(".png")) {
             mimeType = "image/png";
-        } else if (resourcePath.endsWith(".jpg") || resourcePath.endsWith(".jpeg")) {
+        } else if (url.endsWith(".jpg") || url.endsWith(".jpeg")) {
             mimeType = "image/jpeg";
-        } else if (resourcePath.endsWith(".gif")) {
+        } else if (url.endsWith(".gif")) {
             mimeType = "image/gif";
-        } else if (resourcePath.endsWith(".svg")) {
+        } else if (url.endsWith(".svg")) {
             mimeType = "image/svg+xml";
-        } else if (resourcePath.endsWith(".excalidraw")) {
+        } else if (url.endsWith(".excalidraw")) {
             mimeType = "application/json";
         } else {
             mimeType = "application/octet-stream";

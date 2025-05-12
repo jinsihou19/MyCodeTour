@@ -149,25 +149,26 @@ public class Utils {
                     "<div class='plantuml'>$1</div>"
             );
         }
-        // 预处理Mermaid代码块
-        if (processedMarkdown.contains("```mermaid")) {
-            processedMarkdown = processedMarkdown.replaceAll(
-                    "```mermaid\\s*([\\s\\S]*?)```",
-                    "<div class='mermaid'>$1</div>"
-            );
-        }
 
         final MarkdownFlavourDescriptor flavour = new GFMFlavourDescriptor();
         final ASTNode parsedTree = new MarkdownParser(flavour).buildMarkdownTreeFromString(processedMarkdown);
         String html = new HtmlGenerator(processedMarkdown, parsedTree, flavour, false).generateHtml(TAG_RENDERER);
+
+        // 预处理Mermaid代码块
+        if (html.contains("class=\"language-mermaid\"")) {
+            html = html.replaceAll(
+                    "<pre><code class=\"language-mermaid\">\\s*([\\s\\S]*?)</code></pre>",
+                    "<div class='mermaid'>$1</div>"
+            );
+        }
 
         // 包裹 markdown-body
         html = "<article class=\"markdown-body\">" + html + "</article>";
 
         // 引入暗黑CSS
         String darkCss = """
-                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.1/github-markdown-dark.min.css">
-                    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+                    <link rel="stylesheet" href="file:///mycodetour/public/github-markdown-dark.min.css">
+                    <link rel="stylesheet" href="file:///mycodetour/public/github-dark.min.css">
                     <style>
                       body, .markdown-body {
                         background: #23272e !important;
@@ -245,10 +246,10 @@ public class Utils {
 
         // 添加 highlight.js
         scripts.append("""
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+                    <script src="file:///mycodetour/public/highlight.js/11.9.0/highlight.min.js"></script>
+                    <script src="file:///mycodetour/public/highlight.js/11.9.0/languages/java.min.js"></script>
+                    <script src="file:///mycodetour/public/highlight.js/11.9.0/languages/javascript.min.js"></script>
+                    <script src="file:///mycodetour/public/highlight.js/11.9.0/languages/python.min.js"></script>
                     <script>
                         document.addEventListener('DOMContentLoaded', function() {
                             hljs.configure({
@@ -263,15 +264,15 @@ public class Utils {
 
         if (html.contains("class='mermaid'")) {
             scripts.append("""
-                        <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+                        <script src="file:///mycodetour/public/mermaid.min.js"></script>
                         <script>
                             document.addEventListener('DOMContentLoaded', function() {
                                 if (typeof mermaid !== 'undefined') {
                                     mermaid.initialize({
                                         startOnLoad: true,
+                                        logLevel: 'debug',
                                         theme: 'dark',
                                     });
-                                    mermaid.init(undefined, document.querySelectorAll('.mermaid'));
                                 }
                             });
                         </script>
@@ -280,7 +281,7 @@ public class Utils {
 
         if (html.contains("class='plantuml'")) {
             scripts.append("""
-                        <script src="https://cdn.jsdelivr.net/npm/plantuml-encoder@1.4.0/dist/plantuml-encoder.min.js"></script>
+                        <script src="file:///mycodetour/public/plantuml-encoder.min.js"></script>
                         <script>
                             document.addEventListener('DOMContentLoaded', function() {
                                 const plantumlElements = document.querySelectorAll('.plantuml');

@@ -12,8 +12,17 @@ import com.intellij.ui.jcef.JBCefJSQuery;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
 import com.intellij.util.ui.UIUtil;
+import org.cef.browser.CefBrowser;
+import org.cef.browser.CefFrame;
+import org.cef.handler.CefRequestHandlerAdapter;
+import org.cef.handler.CefResourceHandler;
+import org.cef.handler.CefResourceRequestHandler;
+import org.cef.handler.CefResourceRequestHandlerAdapter;
+import org.cef.misc.BoolRef;
+import org.cef.network.CefRequest;
 import org.jetbrains.annotations.NotNull;
 import org.vito.mycodetour.tours.domain.Step;
+import org.vito.mycodetour.tours.service.ResourceHandler;
 import org.vito.mycodetour.tours.state.StateManager;
 
 import javax.swing.Action;
@@ -82,6 +91,29 @@ public class StepEditor extends DialogWrapper {
                 .setUrl("about:blank")
                 .build();
 
+        editorBrowser.getJBCefClient().addRequestHandler(new CefRequestHandlerAdapter() {
+
+            @Override
+            public boolean onOpenURLFromTab(CefBrowser browser, CefFrame frame, String target_url, boolean user_gesture) {
+                return true;
+            }
+
+            @Override
+            public CefResourceRequestHandler getResourceRequestHandler(CefBrowser browser, CefFrame frame, CefRequest request, boolean isNavigation, boolean isDownload, String requestInitiator, BoolRef disableDefaultHandling) {
+                return new CefResourceRequestHandlerAdapter() {
+                    @Override
+                    public CefResourceHandler getResourceHandler(CefBrowser browser, CefFrame frame, CefRequest request) {
+                        String url = request.getURL();
+                        if (url.startsWith("file:///") && !isIndex(url)) {
+                            return new ResourceHandler(project);
+                        }
+                        // 放行非必要处理请求
+                        return null;
+                    }
+                };
+            }
+        }, editorBrowser.getCefBrowser());
+
         // 创建 JavaScript 查询处理器
         jsQuery = JBCefJSQuery.create((JBCefBrowserBase) editorBrowser);
         jsQuery.addHandler((query) -> {
@@ -97,15 +129,18 @@ public class StepEditor extends DialogWrapper {
         String borderColor = isDark ? "#515151" : "#E0E0E0";
 
         // 初始化编辑器
-        String editorHtml = "<!DOCTYPE html>" +
-                "<html>" +
-                "<head>" +
-                "<meta charset='UTF-8'>" +
-                "<link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css'>" +
-                "<link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/sindresorhus/github-markdown-css/github-markdown" + (isDark ? "-dark" : "") + ".css'>" +
-                "<script src='https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js'></script>" +
-                "<script src='https://cdn.jsdelivr.net/npm/marked/marked.min.js'></script>" +
-                "<script src='https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js'></script>" +
+        String editorHtml = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                <meta charset='UTF-8'>
+                <link rel='stylesheet' href='file:///mycodetour/public/easymde.min.css'>
+                <link rel="stylesheet" href="file:///mycodetour/public/github-markdown-dark.min.css">
+                <link rel="stylesheet" href="file:///mycodetour/public/github-dark.min.css">
+                <script src='file:///mycodetour/public/easymde.min.js'></script>
+                <script src='file:///mycodetour/public/marked.min.js'></script>
+                <script src='file:///mycodetour/public/mermaid.min.js'></script>
+                """+
                 "<style>" +
                 "body { margin: 0; padding: 0; background-color: " + bgColor + "; }" +
                 ".EasyMDEContainer { background-color: " + bgColor + "; }" +
@@ -210,7 +245,7 @@ public class StepEditor extends DialogWrapper {
                 "</html>";
 
         String encodedHtml = Base64.getEncoder().encodeToString(editorHtml.getBytes(StandardCharsets.UTF_8));
-        editorBrowser.loadURL("data:text/html;base64," + encodedHtml);
+        editorBrowser.loadHTML(editorHtml);
 
         final JBScrollPane editorPane = new JBScrollPane(editorBrowser.getComponent());
 
@@ -260,6 +295,29 @@ public class StepEditor extends DialogWrapper {
                 .setUrl("about:blank")
                 .build();
 
+        previewBrowser.getJBCefClient().addRequestHandler(new CefRequestHandlerAdapter() {
+
+            @Override
+            public boolean onOpenURLFromTab(CefBrowser browser, CefFrame frame, String target_url, boolean user_gesture) {
+                return true;
+            }
+
+            @Override
+            public CefResourceRequestHandler getResourceRequestHandler(CefBrowser browser, CefFrame frame, CefRequest request, boolean isNavigation, boolean isDownload, String requestInitiator, BoolRef disableDefaultHandling) {
+                return new CefResourceRequestHandlerAdapter() {
+                    @Override
+                    public CefResourceHandler getResourceHandler(CefBrowser browser, CefFrame frame, CefRequest request) {
+                        String url = request.getURL();
+                        if (url.startsWith("file:///") && !isIndex(url)) {
+                            return new ResourceHandler(project);
+                        }
+                        // 放行非必要处理请求
+                        return null;
+                    }
+                };
+            }
+        }, previewBrowser.getCefBrowser());
+
         updatePreviewContent();
 
         final JPanel panel = new JPanel();
@@ -268,6 +326,10 @@ public class StepEditor extends DialogWrapper {
         panel.add(previewBrowser.getComponent());
 
         return panel;
+    }
+
+    private boolean isIndex(String url) {
+        return url.startsWith("file:///jbcefbrowser/") && url.endsWith("url=about:blank");
     }
 
     private void updatePreviewComponent() {
