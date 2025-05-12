@@ -39,13 +39,13 @@
             </action>
         </group>
 
-        <action id="org.vito.mycodetour.tours.actions.TourStepGeneratorAction"
-                class="org.vito.mycodetour.tours.actions.TourStepGeneratorAction"
+        <action id="org.vito.mycodetour.tours.actions.EditorGutterTourStepGeneratorAction"
+                class="org.vito.mycodetour.tours.actions.EditorGutterTourStepGeneratorAction"
                 text="Add Tour Step"
                 description="Set this point a tour step">
             <add-to-group group-id="EditorGutterPopupMenu" anchor="first"/>
         </action>
-        <action id="org.vito.mycodetour.tours.actions.TourStepGeneratorAction.EditorPopupMenu"
+        <action id="org.vito.mycodetour.tours.actions.TourStepGeneratorAction"
                 class="org.vito.mycodetour.tours.actions.TourStepGeneratorAction"
                 text="Add Tour Step"
                 description="Set this point a tour step">
