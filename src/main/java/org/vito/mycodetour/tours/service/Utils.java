@@ -270,7 +270,6 @@ public class Utils {
                                 if (typeof mermaid !== 'undefined') {
                                     mermaid.initialize({
                                         startOnLoad: true,
-                                        logLevel: 'debug',
                                         theme: 'dark',
                                     });
                                 }
