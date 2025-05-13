@@ -462,6 +462,14 @@ public class ToolPaneWindow {
         // 5. 获取所有tour并按文件夹分组
         Map<TourFolder, List<Tour>> folderToursMap = new HashMap<>();
         for (Tour tour : state.getTours()) {
+            // 如果是demo tour，直接添加到根节点
+            if (Validator.isDemo(tour)) {
+                DefaultMutableTreeNode tourNode = new DefaultMutableTreeNode(tour);
+                tour.getSteps().forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
+                root.insert(tourNode, 0);
+                continue;
+            }
+
             VirtualFile tourFile = tour.getVirtualFile();
             if (tourFile != null) {
                 VirtualFile parentDir = tourFile.getParent();
@@ -510,8 +518,13 @@ public class ToolPaneWindow {
         Object userObject = node.getUserObject();
         String nodePath;
 
-        if (userObject instanceof Tour) {
-            nodePath = currentPath + ((Tour) userObject).getVirtualFile().getPath();
+        if (userObject instanceof Tour tour) {
+            if (Validator.isDemo(tour)) {
+                nodePath = currentPath + tour.getTitle();
+            } else {
+                nodePath = currentPath + ((Tour) userObject).getVirtualFile().getPath();
+            }
+
         } else if (userObject instanceof TourFolder) {
             nodePath = currentPath + ((TourFolder) userObject).getVirtualFile().getPath();
         } else if (userObject instanceof String && TREE_TITLE.equals(userObject)) {
