@@ -142,17 +142,25 @@ public class Utils {
             });
         }
 
-        // 预处理 PlantUML 代码块
+        // 预处理 PlantUML 代码块，先把@startuml转为代码块
         if (processedMarkdown.contains("@startuml")) {
             processedMarkdown = processedMarkdown.replaceAll(
                     "@startuml\\s*([\\s\\S]*?)@enduml",
-                    "<div class='plantuml'>$1</div>"
+                    "```startuml\n$1```"
             );
         }
 
         final MarkdownFlavourDescriptor flavour = new GFMFlavourDescriptor();
         final ASTNode parsedTree = new MarkdownParser(flavour).buildMarkdownTreeFromString(processedMarkdown);
         String html = new HtmlGenerator(processedMarkdown, parsedTree, flavour, false).generateHtml(TAG_RENDERER);
+
+        // 预处理 PlantUML 代码块
+        if (html.contains("class=\"language-startuml\"")) {
+            html = html.replaceAll(
+                    "<pre><code class=\"language-startuml\">\\s*([\\s\\S]*?)</code></pre>",
+                    "<div class='plantuml'>$1</div>"
+            );
+        }
 
         // 预处理Mermaid代码块
         if (html.contains("class=\"language-mermaid\"")) {
