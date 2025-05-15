@@ -1,7 +1,7 @@
 package org.vito.mycodetour.tours.service;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
@@ -16,7 +16,6 @@ import com.intellij.psi.PsiField;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.intellij.util.SlowOperations;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.vito.mycodetour.tours.domain.Step;
@@ -29,6 +28,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -49,10 +49,17 @@ public class Navigator {
     public static final String TOUR = "tour://";
     private static final String FILE_JBCEFBROWSER = "file:///jbcefbrowser/";
 
+    /**
+     * 导航到指定行
+     *
+     * @param step       步骤
+     * @param project    工程
+     * @param renderStep 渲染动作
+     */
     public static void navigateLine(@NotNull Step step, @NotNull Project project, BiConsumer<Step, Project> renderStep) {
         if (project.getBasePath() == null) return;
 
-        SlowOperations.allowSlowOperations(() -> {
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
             // Show Step's popup and return
             renderStep.accept(step, project);
 
@@ -67,10 +74,10 @@ public class Navigator {
 
             // Try finding the appropriate file to navigate to
             final String stepFileName = Paths.get(step.getFile()).getFileName().toString();
-            final List<VirtualFile> validVirtualFiles = FilenameIndex
+            final List<VirtualFile> validVirtualFiles = ReadAction.compute(() -> FilenameIndex
                     .getVirtualFilesByName(stepFileName, GlobalSearchScope.projectScope(project)).stream()
                     .filter(file -> Utils.isFileMatchesStep(file, step))
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toList()));
 
             if (validVirtualFiles.isEmpty()) {
                 // Case for configured but not found file
@@ -79,68 +86,26 @@ public class Navigator {
             } else if (validVirtualFiles.size() > 1) {
                 // In case there is more than one file that matches with the Step, prompt User to pick the appropriate one
                 final String prompt = "More Than One Target File Found! Select the One You Want to Navigate to:";
-                JBPopupFactory.getInstance()
+                ApplicationManager.getApplication().invokeLater(() -> JBPopupFactory.getInstance()
                         .createListPopup(new BaseListPopupStep<>(prompt, validVirtualFiles) {
                             @Override
                             public @Nullable PopupStep<?> onChosen(VirtualFile selectedValue, boolean finalChoice) {
-
-                                navigateLine(step, project, selectedValue);
-
-                                // Show a Popup
-                                renderStep.accept(step, project);
-
+                                final int line = step.getLine() != null ? step.getLine() : 0;
+                                navigateLine(line, project, selectedValue);
                                 return super.onChosen(selectedValue, finalChoice);
                             }
-                        }).showInFocusCenter();
+                        }).showInFocusCenter());
 
                 // Notify user to be more specific
                 CodeTourNotifier.warn(project, "Tip: A Step's file path can be more specific either by having a " +
                         "relative path ('file' property) or by setting the 'directory' property on Step's definition");
                 return; // Make sure we return here, because PopUp runs on another Thread (no wait for User input)
             } else {
-                // Case for exactly one match. Just use it
-                navigateLine(step, project, validVirtualFiles.get(0));
+                final int line = step.getLine() != null ? step.getLine() : 0;
+                navigateLine(line, project, validVirtualFiles.get(0));
             }
 
         });
-    }
-
-    /**
-     * 导航代码形如 "MyJava.java:1"
-     *
-     * @param navigateUrl 导航url
-     * @param project     工程
-     */
-    public static void navigateLine(@NotNull String navigateUrl, @NotNull Project project) {
-        String fileName = navigateUrl;
-        int line = 0;
-        if (navigateUrl.contains(":")) {
-            fileName = navigateUrl.substring(0, navigateUrl.indexOf(":"));
-            line = Integer.parseInt(navigateUrl.substring(navigateUrl.indexOf(":") + 1));
-        }
-
-        final List<VirtualFile> validVirtualFiles = new ArrayList<>(FilenameIndex
-                .getVirtualFilesByName(fileName, GlobalSearchScope.projectScope(project)));
-
-        if (validVirtualFiles.isEmpty()) {
-            CodeTourNotifier.error(project, String.format("Could not locate navigation target '%s'", navigateUrl));
-        } else if (validVirtualFiles.size() > 1) {
-            final String prompt = "More Than One Target File Found! Select the One You Want to Navigate To:";
-            int finalLine = line;
-            JBPopupFactory.getInstance()
-                    .createListPopup(new BaseListPopupStep<>(prompt, validVirtualFiles) {
-                        @Override
-                        public @Nullable PopupStep<?> onChosen(VirtualFile selectedValue, boolean finalChoice) {
-                            navigateLine(finalLine, project, selectedValue);
-                            return super.onChosen(selectedValue, finalChoice);
-                        }
-                    }).showInFocusCenter();
-
-            CodeTourNotifier.warn(project, "Tip: A file path can be more specific either by having a " +
-                    "relative path ('file' property) or by setting the 'directory' property on definition");
-        } else {
-            navigateLine(line, project, validVirtualFiles.get(0));
-        }
     }
 
     /**
@@ -151,7 +116,7 @@ public class Navigator {
      */
     public static void navigateCode(@NotNull String navigateUrl, @NotNull Project project) {
 
-        ApplicationManager.getApplication().invokeLater(() -> {
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
             String url = navigateUrl;
             if (navigateUrl.startsWith(NAVIGATE)) {
                 url = navigateUrl.substring(NAVIGATE.length());
@@ -163,8 +128,50 @@ public class Navigator {
             } else {
                 navigateJavaPsi(url, project);
             }
-        }, ModalityState.defaultModalityState());
+        });
     }
+
+    /**
+     * 导航代码形如 "MyJava.java:1"
+     *
+     * @param navigateUrl 导航url
+     * @param project     工程
+     */
+    private static void navigateLine(@NotNull String navigateUrl, @NotNull Project project) {
+        String fileName;
+        int line = 0;
+        if (navigateUrl.contains(":")) {
+            fileName = navigateUrl.substring(0, navigateUrl.indexOf(":"));
+            line = Integer.parseInt(navigateUrl.substring(navigateUrl.indexOf(":") + 1));
+        } else {
+            fileName = navigateUrl;
+        }
+
+        Collection<VirtualFile> files = ReadAction.compute(() ->
+                FilenameIndex.getVirtualFilesByName(fileName, GlobalSearchScope.projectScope(project)));
+        final List<VirtualFile> validVirtualFiles = new ArrayList<>(files);
+
+        if (validVirtualFiles.isEmpty()) {
+            CodeTourNotifier.error(project, String.format("Could not locate navigation target '%s'", navigateUrl));
+        } else if (validVirtualFiles.size() > 1) {
+            final String prompt = "More Than One Target File Found! Select the One You Want to Navigate To:";
+            int finalLine = line;
+            ApplicationManager.getApplication().invokeLater(() -> JBPopupFactory.getInstance()
+                    .createListPopup(new BaseListPopupStep<>(prompt, validVirtualFiles) {
+                        @Override
+                        public @Nullable PopupStep<?> onChosen(VirtualFile selectedValue, boolean finalChoice) {
+                            navigateLine(finalLine, project, selectedValue);
+                            return super.onChosen(selectedValue, finalChoice);
+                        }
+                    }).showInFocusCenter());
+
+            CodeTourNotifier.warn(project, "Tip: A file path can be more specific either by having a " +
+                    "relative path ('file' property) or by setting the 'directory' property on definition");
+        } else {
+            navigateLine(line, project, validVirtualFiles.get(0));
+        }
+    }
+
 
     /**
      * 导航代码，形如
@@ -174,7 +181,7 @@ public class Navigator {
      * @param navigateUrl 导航url
      * @param project     工程
      */
-    public static void navigateJavaPsi(@NotNull String navigateUrl, @NotNull Project project) {
+    private static void navigateJavaPsi(@NotNull String navigateUrl, @NotNull Project project) {
 
         String[] parts = navigateUrl.split("#");
         if (parts.length == 2) {
@@ -186,67 +193,65 @@ public class Navigator {
         }
     }
 
-    private static void navigateLine(@NotNull Step step, @NotNull Project project, VirtualFile targetVirtualFile) {
-        final int line = step.getLine() != null ? step.getLine() - 1 : 0;
-        new OpenFileDescriptor(project, targetVirtualFile, Math.max(line, 0), 1)
-                .navigate(true);
-    }
-
     private static void navigateLine(int line, @NotNull Project project, VirtualFile targetVirtualFile) {
-        new OpenFileDescriptor(project, targetVirtualFile, Math.max(line - 1, 0), 1)
-                .navigate(true);
+        ApplicationManager.getApplication().invokeLater(() ->
+                new OpenFileDescriptor(project, targetVirtualFile, Math.max(line - 1, 0), 1)
+                        .navigate(true));
     }
 
     /**
      * 导航到指定的类和方法
      */
     private static void navigateToMethodField(String className, String methodName, @NotNull Project project) {
-        PsiClass psiClass = JavaPsiFacade.getInstance(project)
-                .findClass(className, GlobalSearchScope.allScope(project));
+        ReadAction.run(() -> {
+            PsiClass psiClass = JavaPsiFacade
+                    .getInstance(project)
+                    .findClass(className, GlobalSearchScope.allScope(project));
 
-        if (psiClass == null) {
-            CodeTourNotifier.error(project, String.format("Could not locate navigation target class '%s'", className));
-            return;
-        }
+            if (psiClass == null) {
+                CodeTourNotifier.error(project, String.format("Could not locate navigation target class '%s'", className));
+                return;
+            }
 
-        // 携带签名的方法引用
-        if (methodName.contains("(")) {
-            String methodNameDecode = URLDecoder.decode(methodName, StandardCharsets.UTF_8);
-            for (PsiMethod method : psiClass.getMethods()) {
-                if (methodWithParameter(method).equals(methodNameDecode)) {
-                    if (navigatePsiElement(method)) {
-                        return;
+            // 携带签名的方法引用
+            if (methodName.contains("(")) {
+                String methodNameDecode = URLDecoder.decode(methodName, StandardCharsets.UTF_8);
+                for (PsiMethod method : psiClass.getMethods()) {
+                    if (methodWithParameter(method).equals(methodNameDecode)) {
+                        if (navigatePsiElement(method)) {
+                            return;
+                        }
+                    }
+                }
+            } else {
+                // 先找方法
+                for (PsiMethod method : psiClass.getMethods()) {
+                    if (method.getName().equals(methodName)) {
+                        if (navigatePsiElement(method)) {
+                            return;
+                        }
+                    }
+                }
+
+                // 从字段中再找一下
+                for (PsiField field : psiClass.getFields()) {
+                    if (field.getName().equals(methodName)) {
+                        if (navigatePsiElement(field)) {
+                            return;
+                        }
                     }
                 }
             }
-        } else {
-            // 先找方法
-            for (PsiMethod method : psiClass.getMethods()) {
-                if (method.getName().equals(methodName)) {
-                    if (navigatePsiElement(method)) {
-                        return;
-                    }
-                }
-            }
 
-            // 从字段中再找一下
-            for (PsiField field : psiClass.getFields()) {
-                if (field.getName().equals(methodName)) {
-                    if (navigatePsiElement(field)) {
-                        return;
-                    }
-                }
-            }
-        }
-
-        // 没有这个方法就导航到类吧
-        navigatePsiElement(psiClass);
+            // 没有这个方法就导航到类吧
+            navigatePsiElement(psiClass);
+        });
     }
 
     private static boolean navigatePsiElement(PsiElement element) {
         Navigatable navigatable = (Navigatable) element.getNavigationElement();
         if (navigatable.canNavigate()) {
-            navigatable.navigate(true);
+            ApplicationManager.getApplication().invokeLater(() -> navigatable.navigate(true));
             return true;
         }
         return false;
@@ -256,8 +261,8 @@ public class Navigator {
      * 导航到指定的类
      */
     private static void navigateToClass(String className, @NotNull Project project) {
-        PsiClass psiClass = JavaPsiFacade.getInstance(project)
-                .findClass(className, GlobalSearchScope.allScope(project));
+        PsiClass psiClass = ReadAction.compute(() -> JavaPsiFacade.getInstance(project)
+                .findClass(className, GlobalSearchScope.allScope(project)));
 
         if (psiClass == null) {
             CodeTourNotifier.error(project, String.format("Could not locate navigation target class '%s'", className));
