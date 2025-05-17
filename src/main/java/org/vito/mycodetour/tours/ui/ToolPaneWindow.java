@@ -1,6 +1,7 @@
 package org.vito.mycodetour.tours.ui;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.ide.actions.RevealFileAction;
 import com.intellij.ide.dnd.DnDAction;
 import com.intellij.ide.dnd.DnDDragStartBean;
 import com.intellij.ide.dnd.DnDEvent;
@@ -57,7 +58,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -411,9 +411,8 @@ public class ToolPaneWindow {
         final ToursState state = StateManager.getInstance().getState(project);
         final DefaultMutableTreeNode root = new DefaultMutableTreeNode(TREE_TITLE);
 
-        // 1. 获取所有文件夹，并按路径排序（确保父文件夹在前）
+        // 1. 获取所有文件夹
         List<TourFolder> allFolders = state.getFolders();
-        allFolders.sort(Comparator.comparing(folder -> folder.getVirtualFile().getPath()));
 
         // 2. 统计.tours文件夹的数量和找到唯一的.tours文件夹
         List<TourFolder> toursDirs = allFolders.stream()
@@ -712,15 +711,22 @@ public class ToolPaneWindow {
     private void folderClickListener(MouseEvent e, DefaultMutableTreeNode node) {
         if (e.getButton() == MouseEvent.BUTTON3) {
             final JBPopupMenu menu = new JBPopupMenu("Folder Context Menu");
+            TourFolder tourFolder = (TourFolder) node.getUserObject();
+
+            // 在文件系统打开
+            final JMenuItem openDirectoryAction = new JMenuItem("Open in File System", AllIcons.Actions.AddFile);
+            openDirectoryAction.addActionListener(d ->
+                    RevealFileAction.openDirectory(tourFolder.getVirtualFile().toNioPath()));
 
             // 创建新Tour的选项
             final JMenuItem newTourAction = new JMenuItem("Create New Tour", AllIcons.Actions.AddFile);
-            newTourAction.addActionListener(d -> createNewTourInFolderListener((TourFolder) node.getUserObject()));
+            newTourAction.addActionListener(d -> createNewTourInFolderListener(tourFolder));
 
             // 创建新文件夹的选项
             final JMenuItem newFolderAction = new JMenuItem("Create New Folder", AllIcons.Actions.NewFolder);
-            newFolderAction.addActionListener(d -> createNewFolderListener((TourFolder) node.getUserObject()));
+            newFolderAction.addActionListener(d -> createNewFolderListener(tourFolder));
 
+            menu.add(openDirectoryAction);
             menu.add(newTourAction);
             menu.add(newFolderAction);
             menu.show(toursTree, e.getX(), e.getY());

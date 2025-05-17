@@ -52,14 +52,14 @@ public class TreeRenderer extends ColoredTreeCellRenderer {
             // 设置文本
             if (userObject instanceof TourFolder folder) {
                 String displayName = folder.getDisplayName();
-                if (displayName.startsWith("Tours (")) {
+                if (displayName.startsWith("Tours ")) {
                     // 分离"Tours"和路径信息
                     String toursPart = "Tours";
-                    String pathPart = displayName.substring(7, displayName.length() - 1);
+                    String pathPart = displayName.substring(6);
                     // 添加"Tours"文本
                     append(toursPart, SimpleTextAttributes.REGULAR_ATTRIBUTES);
                     // 添加灰色路径信息
-                    append(" (" + pathPart + ")", SimpleTextAttributes.GRAYED_ATTRIBUTES);
+                    append(" " + pathPart, SimpleTextAttributes.GRAYED_ATTRIBUTES);
                 } else {
                     append(displayName, SimpleTextAttributes.REGULAR_ATTRIBUTES);
                 }

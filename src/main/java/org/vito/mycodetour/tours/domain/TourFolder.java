@@ -30,21 +30,24 @@ public class TourFolder {
      * 否则显示原始名称
      */
     public String getDisplayName() {
-
         if (getName().equals(Props.TOURS_DIR)) {
-
             // 如果是.tours文件夹，返回相对路径
             String relativePath = virtualFile.getPath();
             String projectPath = project.getBasePath();
-            if (relativePath.startsWith(projectPath)) {
+            if (projectPath != null && relativePath.startsWith(projectPath)) {
                 relativePath = relativePath.substring(projectPath.length() + 1);
+                if(relativePath.equals(Props.TOURS_DIR)) {
+                    relativePath = "";
+                }
             }
-            // 如果路径超过两级，简化显示
-            String[] parts = relativePath.split("/");
-            if (parts.length > 2) {
-                relativePath = parts[0] + "/.../" + parts[parts.length - 1];
+            
+            // 使用 ~ 替换用户主目录路径
+            String userHome = System.getProperty("user.home");
+            if (relativePath.startsWith(userHome)) {
+                relativePath = "~" + relativePath.substring(userHome.length());
             }
-            return "Tours (" + relativePath + ")";
+            
+            return "Tours " + relativePath;
         }
         return getName();
     }
