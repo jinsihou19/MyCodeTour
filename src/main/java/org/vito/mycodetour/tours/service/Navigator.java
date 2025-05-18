@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.ui.popup.PopupStep;
 import com.intellij.openapi.ui.popup.util.BaseListPopupStep;
@@ -50,14 +51,13 @@ public class Navigator {
     /**
      * 导航到指定行
      *
-     * @param step       步骤
-     * @param project    工程
+     * @param step    步骤
+     * @param project 工程
      */
     public static void navigateLine(@NotNull Step step, @NotNull Project project) {
         if (project.getBasePath() == null) return;
 
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-
             if (step.getFile() == null) {
                 return;
             }
@@ -67,37 +67,53 @@ public class Navigator {
                 return;
             }
 
-            // Try finding the appropriate file to navigate to
-            final String stepFileName = Paths.get(step.getFile()).getFileName().toString();
-            final List<VirtualFile> validVirtualFiles = ReadAction.compute(() -> new ArrayList<>(FilenameIndex
-                    .getVirtualFilesByName(stepFileName, GlobalSearchScope.projectScope(project))));
+            // 使用 ProjectRootManager 查找文件
+            String relativePath = step.getFile();
+            VirtualFile targetFile = ReadAction.compute(() -> {
+                ProjectRootManager rootManager = ProjectRootManager.getInstance(project);
+                // 遍历所有源码根目录
+                for (VirtualFile sourceRoot : rootManager.getContentSourceRoots()) {
+                    VirtualFile file = sourceRoot.findFileByRelativePath(relativePath);
+                    if (file != null) {
+                        return file;
+                    }
+                }
+                return null;
+            });
 
-            if (validVirtualFiles.isEmpty()) {
-                // Case for configured but not found file
-                CodeTourNotifier.error(project, String.format("Could not locate navigation target '%s' for Step '%s'",
-                        step.getFile(), step.getTitle()));
-            } else if (validVirtualFiles.size() > 1) {
-                // In case there is more than one file that matches with the Step, prompt User to pick the appropriate one
-                final String prompt = "More Than One Target File Found! Select the One You Want to Navigate to:";
-                ApplicationManager.getApplication().invokeLater(() -> JBPopupFactory.getInstance()
-                        .createListPopup(new BaseListPopupStep<>(prompt, validVirtualFiles) {
-                            @Override
-                            public @Nullable PopupStep<?> onChosen(VirtualFile selectedValue, boolean finalChoice) {
-                                final int line = step.getLine() != null ? step.getLine() : 0;
-                                navigateLine(line, project, selectedValue);
-                                return super.onChosen(selectedValue, finalChoice);
-                            }
-                        }).showInFocusCenter());
-
-                // Notify user to be more specific
-                CodeTourNotifier.warn(project, "Tip: A Step's file path can be more specific either by having a " +
-                        "relative path ('file' property) or by setting the 'directory' property on Step's definition");
-                return; // Make sure we return here, because PopUp runs on another Thread (no wait for User input)
-            } else {
+            if (targetFile != null) {
                 final int line = step.getLine() != null ? step.getLine() : 0;
-                navigateLine(line, project, validVirtualFiles.get(0));
-            }
+                navigateLine(line, project, targetFile);
+            } else {
+                // 如果找不到文件，回退到原来的文件名搜索逻辑
+                final String stepFileName = Paths.get(step.getFile()).getFileName().toString();
+                final List<VirtualFile> validVirtualFiles = ReadAction.compute(() -> new ArrayList<>(FilenameIndex
+                        .getVirtualFilesByName(stepFileName, GlobalSearchScope.projectScope(project))));
 
+                if (validVirtualFiles.isEmpty()) {
+                    CodeTourNotifier.error(project, String.format("Could not locate navigation target '%s' for Step '%s'",
+                            step.getFile(), step.getTitle()));
+                } else if (validVirtualFiles.size() > 1) {
+                    // In case there is more than one file that matches with the Step, prompt User to pick the appropriate one
+                    final String prompt = "More Than One Target File Found! Select the One You Want to Navigate to:";
+                    ApplicationManager.getApplication().invokeLater(() -> JBPopupFactory.getInstance()
+                            .createListPopup(new BaseListPopupStep<>(prompt, validVirtualFiles) {
+                                @Override
+                                public @Nullable PopupStep<?> onChosen(VirtualFile selectedValue, boolean finalChoice) {
+                                    final int line = step.getLine() != null ? step.getLine() : 0;
+                                    navigateLine(line, project, selectedValue);
+                                    return super.onChosen(selectedValue, finalChoice);
+                                }
+                            }).showInFocusCenter());
+
+                    // Notify user to be more specific
+                    CodeTourNotifier.warn(project, "Tip: A Step's file path can be more specific either by having a " +
+                            "relative path ('file' property) or by setting the 'directory' property on Step's definition");
+                } else {
+                    final int line = step.getLine() != null ? step.getLine() : 0;
+                    navigateLine(line, project, validVirtualFiles.get(0));
+                }
+            }
         });
     }
 
@@ -140,28 +156,46 @@ public class Navigator {
             fileName = navigateUrl;
         }
 
-        Collection<VirtualFile> files = ReadAction.compute(() ->
-                FilenameIndex.getVirtualFilesByName(fileName, GlobalSearchScope.projectScope(project)));
-        final List<VirtualFile> validVirtualFiles = new ArrayList<>(files);
+        // 使用 ProjectRootManager 查找文件
+        VirtualFile targetFile = ReadAction.compute(() -> {
+            ProjectRootManager rootManager = ProjectRootManager.getInstance(project);
+            // 遍历所有源码根目录
+            for (VirtualFile sourceRoot : rootManager.getContentSourceRoots()) {
+                VirtualFile file = sourceRoot.findFileByRelativePath(fileName);
+                if (file != null) {
+                    return file;
+                }
+            }
+            return null;
+        });
 
-        if (validVirtualFiles.isEmpty()) {
-            CodeTourNotifier.error(project, String.format("Could not locate navigation target '%s'", navigateUrl));
-        } else if (validVirtualFiles.size() > 1) {
-            final String prompt = "More Than One Target File Found! Select the One You Want to Navigate To:";
-            int finalLine = line;
-            ApplicationManager.getApplication().invokeLater(() -> JBPopupFactory.getInstance()
-                    .createListPopup(new BaseListPopupStep<>(prompt, validVirtualFiles) {
-                        @Override
-                        public @Nullable PopupStep<?> onChosen(VirtualFile selectedValue, boolean finalChoice) {
-                            navigateLine(finalLine, project, selectedValue);
-                            return super.onChosen(selectedValue, finalChoice);
-                        }
-                    }).showInFocusCenter());
-
-            CodeTourNotifier.warn(project, "Tip: A file path can be more specific either by having a " +
-                    "relative path ('file' property) or by setting the 'directory' property on definition");
+        if (targetFile != null) {
+            navigateLine(line, project, targetFile);
         } else {
-            navigateLine(line, project, validVirtualFiles.get(0));
+
+            Collection<VirtualFile> files = ReadAction.compute(() ->
+                    FilenameIndex.getVirtualFilesByName(fileName, GlobalSearchScope.projectScope(project)));
+            final List<VirtualFile> validVirtualFiles = new ArrayList<>(files);
+
+            if (validVirtualFiles.isEmpty()) {
+                CodeTourNotifier.error(project, String.format("Could not locate navigation target '%s'", navigateUrl));
+            } else if (validVirtualFiles.size() > 1) {
+                final String prompt = "More Than One Target File Found! Select the One You Want to Navigate To:";
+                int finalLine = line;
+                ApplicationManager.getApplication().invokeLater(() -> JBPopupFactory.getInstance()
+                        .createListPopup(new BaseListPopupStep<>(prompt, validVirtualFiles) {
+                            @Override
+                            public @Nullable PopupStep<?> onChosen(VirtualFile selectedValue, boolean finalChoice) {
+                                navigateLine(finalLine, project, selectedValue);
+                                return super.onChosen(selectedValue, finalChoice);
+                            }
+                        }).showInFocusCenter());
+
+                CodeTourNotifier.warn(project, "Tip: A file path can be more specific either by having a " +
+                        "relative path ('file' property) or by setting the 'directory' property on definition");
+            } else {
+                navigateLine(line, project, validVirtualFiles.get(0));
+            }
         }
     }
 

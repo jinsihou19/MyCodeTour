@@ -3,9 +3,11 @@ package org.vito.mycodetour.tours.actions;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiElement;
@@ -70,7 +72,8 @@ public class TourStepGeneratorAction extends AnAction {
             if (virtualFile == null) {
                 return;
             }
-            step = Step.with(virtualFile.getName(), line);
+            String relativePath = getRelativePath(project, virtualFile);
+            step = Step.with(relativePath, line);
         }
 
 
@@ -101,6 +104,22 @@ public class TourStepGeneratorAction extends AnAction {
             project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(activeTour.get());
         }
 
+    }
+
+    protected static String getRelativePath(Project project, VirtualFile virtualFile) {
+        // 获取文件相对于源码根目录的路径
+        return ReadAction.compute(() -> {
+            ProjectFileIndex fileIndex = ProjectFileIndex.getInstance(project);
+            VirtualFile sourceRoot = fileIndex.getSourceRootForFile(virtualFile);
+            if (sourceRoot != null) {
+                String fullPath = virtualFile.getPath();
+                String sourceRootPath = sourceRoot.getPath();
+                if (fullPath.startsWith(sourceRootPath)) {
+                    return fullPath.substring(sourceRootPath.length() + 1);
+                }
+            }
+            return virtualFile.getName();
+        });
     }
 
 

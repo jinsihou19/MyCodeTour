@@ -140,9 +140,12 @@ public class Step {
      * @return step
      */
     public static Step with(String reference, int line) {
-        final String title = String.format("%s:%s",
-                PsiNameHelper.getShortClassName(reference.replace(".java", "")),
-                line);
+        final String title = reference.contains("/")
+                ? reference.substring(reference.lastIndexOf("/") + 1)
+                : String.format(
+                    "%s:%s",
+                    PsiNameHelper.getShortClassName(reference.replace(".java", "")),
+                    line);
         return Step.builder()
                 .title(title)
                 .description("Simple Navigation to " + title)

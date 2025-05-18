@@ -119,6 +119,14 @@ public class ToursState {
     }
 
     public boolean isValidStep(String identifier) {
+        if (identifier.contains(";")) {
+            for (String s : identifier.split(";")) {
+                if (stepIdentifiersIndex.containsValue(s)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         return stepIdentifiersIndex.containsValue(identifier);
     }
 
@@ -618,9 +626,19 @@ public class ToursState {
     }
 
     public Optional<Step> findStepByReference(String reference) {
+        // 如果引用包含逗号，说明有两个标识符
+        String[] references = reference.split(";");
+        String relativePathRef = references[0];
+        String fileNameRef = references.length > 1 ? references[1] : null;
+
         final Optional<Tour> tourToActivate = getTours().stream()
                 .filter(tour -> tour.getSteps().stream()
-                        .anyMatch(step -> reference.equals(step.reference())))
+                        .anyMatch(step -> {
+                            String stepRef = step.reference();
+                            // 检查是否匹配任一标识符
+                            return stepRef.equals(relativePathRef) ||
+                                    stepRef.equals(fileNameRef);
+                        }))
                 .findFirst();
         if (tourToActivate.isEmpty()) {
             return Optional.empty();
@@ -629,7 +647,9 @@ public class ToursState {
         final List<Step> steps = tourToActivate.get().getSteps();
         for (int i = 0; i < steps.size(); i++) {
             final Step step = steps.get(i);
-            if (reference.equals(step.reference())) {
+            String stepRef = step.reference();
+            if (stepRef.equals(relativePathRef) ||
+                    (fileNameRef != null && stepRef.equals(fileNameRef))) {
                 setActiveStepIndex(i);
                 return Optional.of(step);
             }

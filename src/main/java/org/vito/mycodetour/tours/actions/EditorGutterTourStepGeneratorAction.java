@@ -28,7 +28,6 @@ import static java.util.Objects.isNull;
  */
 public class EditorGutterTourStepGeneratorAction extends AnAction {
 
-
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         final Project project = e.getProject();
@@ -57,8 +56,8 @@ public class EditorGutterTourStepGeneratorAction extends AnAction {
 
         final Optional<Tour> activeTour = StateManager.getInstance().getState(project).getActiveTour();
         if (activeTour.isPresent()) {
-            final Step step = Step.with(virtualFile.getName(), line);
-
+            String relativePath = TourStepGeneratorAction.getRelativePath(project, virtualFile);
+            final Step step = Step.with(relativePath, line);
             // Provide a dialog for Step editing
             final StepEditor stepEditor = new StepEditor(project, step);
             final boolean okSelected = stepEditor.showAndGet();
@@ -72,4 +71,6 @@ public class EditorGutterTourStepGeneratorAction extends AnAction {
             project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(activeTour.get());
         }
     }
+
+
 }

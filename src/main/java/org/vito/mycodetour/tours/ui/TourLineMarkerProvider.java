@@ -3,9 +3,12 @@ package org.vito.mycodetour.tours.ui;
 import com.intellij.codeInsight.daemon.GutterName;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProviderDescriptor;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.markup.GutterIconRenderer;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ProjectFileIndex;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -28,7 +31,7 @@ import java.util.Map;
  */
 public class TourLineMarkerProvider extends LineMarkerProviderDescriptor {
 
-    private final Map<String, PsiElement> markedLines = new HashMap<>();
+//    private final Map<String, PsiElement> markedLines = new HashMap<>();
 
     @Override
     public @Nullable("null means disabled") @GutterName String getName() {
@@ -83,7 +86,7 @@ public class TourLineMarkerProvider extends LineMarkerProviderDescriptor {
                 continue;
             }
 
-            // 检查是否是有效的步骤
+            // 检查是否是有效的步骤（同时检查相对路径和文件名）
             if (StateManager.getInstance().getState(project).isValidStep(elementIdentifier)) {
                 if (!markedLines.containsKey(elementIdentifier) || element.equals(markedLines.get(elementIdentifier))) {
                     markedLines.put(elementIdentifier, element);
@@ -114,7 +117,9 @@ public class TourLineMarkerProvider extends LineMarkerProviderDescriptor {
      * - 方法：className#methodName
      * - 类：fullyQualifiedClassName
      * - 字段：className#fieldName
-     * - 其他：fileName:lineNumber
+     * - 其他：返回两个标识符，用逗号分隔：
+     *   1. relativePath:lineNumber（相对于源码根目录的路径）
+     *   2. fileName:lineNumber（仅文件名）
      */
     private @Nullable String getElementIdentifier(@NotNull PsiElement element) {
         String reference = PsiHelper.getReference(element);
@@ -128,7 +133,30 @@ public class TourLineMarkerProvider extends LineMarkerProviderDescriptor {
             Document document = PsiDocumentManager.getInstance(element.getProject()).getDocument(containingFile);
             if (document != null) {
                 int lineNumber = document.getLineNumber(element.getTextOffset()) + 1;
-                return String.format("%s:%d", containingFile.getName(), lineNumber);
+                // 获取文件相对于源码根目录的路径
+                String relativePath = ReadAction.compute(() -> {
+                    Project project = element.getProject();
+                    ProjectFileIndex fileIndex = ProjectFileIndex.getInstance(project);
+                    VirtualFile virtualFile = containingFile.getVirtualFile();
+                    if (virtualFile != null) {
+                        VirtualFile sourceRoot = fileIndex.getSourceRootForFile(virtualFile);
+                        if (sourceRoot != null) {
+                            String fullPath = virtualFile.getPath();
+                            String sourceRootPath = sourceRoot.getPath();
+                            if (fullPath.startsWith(sourceRootPath)) {
+                                return fullPath.substring(sourceRootPath.length() + 1);
+                            }
+                        }
+                    }
+                    return null;
+                });
+
+                // 返回两个标识符，用逗号分隔
+                String fileName = containingFile.getName();
+                if (relativePath != null) {
+                    return String.format("%s:%d;%s:%d", relativePath, lineNumber, fileName, lineNumber);
+                }
+                return String.format("%s:%d", fileName, lineNumber);
             }
         }
         return null;
