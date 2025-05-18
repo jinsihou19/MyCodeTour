@@ -5,7 +5,9 @@ import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 指南
@@ -92,12 +94,18 @@ public class Tour {
         return this;
     }
 
+    /**
+     * 获取step的不可变的列表
+     *
+     * @return unmodifiableList
+     */
     public List<Step> getSteps() {
-        return steps;
+        return Collections.unmodifiableList(steps);
     }
 
     public Tour setSteps(List<Step> steps) {
         this.steps = steps;
+        linkStep();
         return this;
     }
 
@@ -110,6 +118,49 @@ public class Tour {
         return this;
     }
 
+    public Tour linkStep() {
+        this.steps = steps.stream().map(step -> step.setOwner(this)).collect(Collectors.toList());
+        return this;
+    }
+
+    /**
+     * 删除步骤
+     *
+     * @param index 索引
+     * @return
+     */
+    public Tour removeStep(int index) {
+        this.steps.remove(index);
+        return this;
+    }
+
+    /**
+     * 删除步骤
+     *
+     * @param step
+     * @return
+     */
+    public Tour removeStep(Step step) {
+        this.steps.remove(step.setOwner(null));
+        return this;
+    }
+
+    /**
+     * 添加步骤
+     *
+     * @param step
+     * @return
+     */
+    public Tour addStep(Step step) {
+        this.steps.add(step.setOwner(this));
+        return this;
+    }
+
+    public Tour addStep(int index, Step step) {
+        this.steps.add(index, step.setOwner(this));
+        return this;
+    }
+
 
     /**
      * 获取指定index的步骤
@@ -119,7 +170,7 @@ public class Tour {
      */
     @Nullable
     public Step getStep(int index) {
-        if(steps == null || index < 0 || index >= steps.size()) {
+        if (steps == null || index < 0 || index >= steps.size()) {
             return null;
         }
         return steps.get(index);

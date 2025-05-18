@@ -10,7 +10,6 @@ import org.jetbrains.annotations.NotNull;
 import org.vito.mycodetour.tours.domain.OnboardingAssistant;
 import org.vito.mycodetour.tours.domain.Step;
 import org.vito.mycodetour.tours.domain.Tour;
-import org.vito.mycodetour.tours.service.Utils;
 import org.vito.mycodetour.tours.ui.CodeTourNotifier;
 
 import java.nio.file.Paths;
@@ -69,7 +68,6 @@ public class Validator {
         final String stepFileName = Paths.get(step.getFile()).getFileName().toString();
         final List<VirtualFile> validVirtualFiles = FilenameIndex
                 .getVirtualFilesByName(stepFileName, GlobalSearchScope.projectScope(project)).stream()
-                .filter(file -> Utils.isFileMatchesStep(file, step))
                 .toList();
 
         if (validVirtualFiles.isEmpty()) {

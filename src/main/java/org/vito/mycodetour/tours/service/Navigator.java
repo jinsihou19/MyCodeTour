@@ -31,8 +31,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
 
 import static org.vito.mycodetour.tours.service.PsiHelper.methodWithParameter;
 
@@ -54,14 +52,11 @@ public class Navigator {
      *
      * @param step       步骤
      * @param project    工程
-     * @param renderStep 渲染动作
      */
-    public static void navigateLine(@NotNull Step step, @NotNull Project project, BiConsumer<Step, Project> renderStep) {
+    public static void navigateLine(@NotNull Step step, @NotNull Project project) {
         if (project.getBasePath() == null) return;
 
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            // Show Step's popup and return
-            renderStep.accept(step, project);
 
             if (step.getFile() == null) {
                 return;
@@ -74,10 +69,8 @@ public class Navigator {
 
             // Try finding the appropriate file to navigate to
             final String stepFileName = Paths.get(step.getFile()).getFileName().toString();
-            final List<VirtualFile> validVirtualFiles = ReadAction.compute(() -> FilenameIndex
-                    .getVirtualFilesByName(stepFileName, GlobalSearchScope.projectScope(project)).stream()
-                    .filter(file -> Utils.isFileMatchesStep(file, step))
-                    .collect(Collectors.toList()));
+            final List<VirtualFile> validVirtualFiles = ReadAction.compute(() -> new ArrayList<>(FilenameIndex
+                    .getVirtualFilesByName(stepFileName, GlobalSearchScope.projectScope(project))));
 
             if (validVirtualFiles.isEmpty()) {
                 // Case for configured but not found file

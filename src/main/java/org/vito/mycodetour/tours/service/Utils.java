@@ -1,7 +1,6 @@
 package org.vito.mycodetour.tours.service;
 
 import com.intellij.lang.documentation.DocumentationMarkup;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiNameHelper;
 import org.apache.commons.lang3.StringUtils;
 import org.intellij.markdown.ast.ASTNode;
@@ -11,9 +10,7 @@ import org.intellij.markdown.html.HtmlGenerator;
 import org.intellij.markdown.parser.MarkdownParser;
 import org.jetbrains.annotations.NotNull;
 import org.vito.mycodetour.tours.domain.Props;
-import org.vito.mycodetour.tours.domain.Step;
 
-import java.nio.file.Paths;
 import java.util.regex.Pattern;
 
 /**
@@ -308,17 +305,6 @@ public class Utils {
         html = darkCss + scripts + html;
 
         return html;
-    }
-
-    public static boolean isFileMatchesStep(VirtualFile file, @NotNull Step step) {
-        if (file.isDirectory())
-            return false;
-
-        final String stepDirectory = step.getDirectory() != null ? step.getDirectory() : "";
-        final String stepFilePath = Paths.get(stepDirectory, step.getFile()).toString();
-        final String filePath = Paths.get(file.getPath()).toString();
-
-        return filePath.endsWith(stepFilePath);
     }
 
     private static String createLink(String value) {

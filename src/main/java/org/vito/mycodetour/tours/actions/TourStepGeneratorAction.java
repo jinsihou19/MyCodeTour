@@ -94,7 +94,7 @@ public class TourStepGeneratorAction extends AnAction {
             if (!okSelected) return; // i.e. cancel the step creation
 
             final Step updatedStep = stepEditor.getUpdatedStep();
-            activeTour.get().getSteps().add(updatedStep);
+            activeTour.get().addStep(updatedStep);
             StateManager.getInstance().getState(project).updateTour(activeTour.get());
 
             // Notify UI to re-render

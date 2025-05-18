@@ -6,6 +6,7 @@ import com.google.common.collect.Multimap;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.intellij.diagnostic.PluginException;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.diagnostic.Logger;
@@ -59,6 +60,7 @@ public class ToursState {
             .create();
 
     private List<Tour> tours = new ArrayList<>();
+    private List<TourFolder> tourFolders = new ArrayList<>();
     private Optional<Tour> activeTour = Optional.empty();
     private int activeStepIndex = -1;
     private Project project;
@@ -69,7 +71,16 @@ public class ToursState {
 
     public ToursState(Project project) {
         this.project = project;
-        tours = loadTours(project);
+        loadData(project);
+    }
+
+    private void loadData(Project project) {
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            tourFolders = loadFolders();
+            tours = loadTours(List.copyOf(tourFolders));
+
+            project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(null);
+        });
     }
 
     public List<Tour> getTours() {
@@ -123,20 +134,13 @@ public class ToursState {
 
     }
 
-    private List<Tour> loadTours(@NotNull Project project) {
+    private List<Tour> loadTours(@NotNull List<TourFolder> tourFolders) {
         final List<Tour> tours = new ArrayList<>();
         AppSettingsState settings = AppSettingsState.getInstance();
         if (settings.isOnboardingAssistantOn()) {
             final Tour onboardingTour = OnboardingAssistant.getInstance().getTour();
             if (onboardingTour != null)
                 tours.add(onboardingTour);
-        }
-
-        // 使用索引查找所有.tour文件夹
-        var tourFolders = loadFoldersFromIndex();
-        if (tourFolders.isEmpty()) {
-            // 如果索引中没有找到，尝试从文件系统加载
-            tourFolders = loadFoldersFromFS();
         }
 
         // 从每个文件夹中加载tour文件
@@ -243,7 +247,8 @@ public class ToursState {
         for (VirtualFile file : folderFile.getChildren()) {
             if (!file.isDirectory() && Props.TOUR_EXTENSION.equals(file.getExtension())) {
                 parse(file).ifPresent(tour -> {
-                    tour.setVirtualFile(file);
+                    tour.setVirtualFile(file)
+                            .linkStep();
                     folderTours.add(tour);
                 });
             }
@@ -353,7 +358,7 @@ public class ToursState {
     }
 
     public void reloadState() {
-        tours = loadTours(project);
+        loadData(project);
     }
 
     @NotNull
@@ -369,7 +374,7 @@ public class ToursState {
                     Tour tour;
                     try {
                         tour = GSON.fromJson(new InputStreamReader(f.getInputStream(), StandardCharsets.UTF_8), Tour.class);
-                        tour.setVirtualFile(f);
+                        tour.setVirtualFile(f).linkStep();
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
@@ -388,7 +393,7 @@ public class ToursState {
                                 LOG.error("Skipping file: " + virtualFile.getName(), e);
                                 return null;
                             }
-                            tour.setVirtualFile(virtualFile);
+                            tour.setVirtualFile(virtualFile).linkStep();
                             return tour;
                         })
                         .filter(Objects::nonNull))
@@ -592,17 +597,24 @@ public class ToursState {
         return Optional.empty();
     }
 
+    private List<TourFolder> loadFolders() {
+
+        return ReadAction.compute(() -> {
+            // 优先使用索引查找
+            List<TourFolder> folders = loadFoldersFromIndex();
+            if (folders.isEmpty()) {
+                // 如果索引中没有找到，从文件系统加载
+                folders = loadFoldersFromFS();
+            }
+            return folders;
+        });
+    }
+
     /**
      * 获取所有文件夹
      */
     public List<TourFolder> getFolders() {
-        // 优先使用索引查找
-        List<TourFolder> folders = loadFoldersFromIndex();
-        if (folders.isEmpty()) {
-            // 如果索引中没有找到，从文件系统加载
-            folders = loadFoldersFromFS();
-        }
-        return folders;
+        return tourFolders;
     }
 
     public Optional<Step> findStepByReference(String reference) {
@@ -613,7 +625,6 @@ public class ToursState {
         if (tourToActivate.isEmpty()) {
             return Optional.empty();
         }
-        setActiveTour(tourToActivate.get());
 
         final List<Step> steps = tourToActivate.get().getSteps();
         for (int i = 0; i < steps.size(); i++) {

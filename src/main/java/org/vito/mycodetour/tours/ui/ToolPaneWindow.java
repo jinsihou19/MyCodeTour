@@ -8,6 +8,7 @@ import com.intellij.ide.dnd.DnDEvent;
 import com.intellij.ide.dnd.DnDManager;
 import com.intellij.ide.dnd.DnDSource;
 import com.intellij.ide.dnd.DnDTarget;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
@@ -116,26 +117,33 @@ public class ToolPaneWindow {
      * Handle plugin messaging
      */
     public void registerMessageBusListener() {
-        ToursState state = StateManager.getInstance().getState(project);
-        project.getMessageBus().connect().subscribe(TourUpdateNotifier.TOPIC, (TourUpdateNotifier) (tour) -> {
-            state.reloadState();
-            updateToursTree();
-            if (tour != null && state.getActiveStepIndex() != -1) {
-                Step step = tour.getStep(state.getActiveStepIndex());
-                if (step != null) {
-                    createOrUpdateContent(step, project);
-                }
-            }
-        });
 
-        project.getMessageBus().connect().subscribe(StepSelectionNotifier.TOPIC, (StepSelectionNotifier) (step) -> {
-            StateManager.getInstance().getActiveTour(project).ifPresent(tour -> {
-                if (!toolWindow.isVisible()) {
-                    toolWindow.show();
-                }
-                selectTourStep(tour, state.getActiveStepIndex());
-            });
-        });
+        project.getMessageBus().connect().subscribe(
+                TourUpdateNotifier.TOPIC,
+                (TourUpdateNotifier) (tour) ->
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            updateToursTree();
+                            renderActiveTourStepContent(tour);
+                        }));
+
+        project.getMessageBus().connect().subscribe(
+                StepSelectionNotifier.TOPIC,
+                (StepSelectionNotifier) (step) -> {
+                    if (!toolWindow.isVisible()) {
+                        toolWindow.show();
+                    }
+                    selectTourStep(step);
+                });
+    }
+
+    private void renderActiveTourStepContent(Tour tour) {
+        ToursState state = StateManager.getInstance().getState(project);
+        if (tour != null && state.getActiveStepIndex() != -1) {
+            Step step = tour.getStep(state.getActiveStepIndex());
+            if (step != null) {
+                createOrUpdateContent(step, project);
+            }
+        }
     }
 
     private void createToursTree() {
@@ -320,8 +328,8 @@ public class ToolPaneWindow {
                     Tour targetTour = (Tour) targetNode.getUserObject();
                     if (targetTour != sourceTour) {
                         // 如果是不同的Tour，需要移动Step
-                        targetTour.getSteps().add(draggedStep);
-                        sourceTour.getSteps().remove(draggedStep);
+                        sourceTour.removeStep(draggedStep);
+                        targetTour.addStep(draggedStep);
                         StateManager.getInstance().getState(project).updateTour(sourceTour);
                         StateManager.getInstance().getState(project).updateTour(targetTour);
                     }
@@ -339,7 +347,7 @@ public class ToolPaneWindow {
                     int targetIndex = targetTour.getSteps().indexOf(targetStep);
                     // 先移除原step
                     int oldIndex = sourceTour.getSteps().indexOf(draggedStep);
-                    sourceTour.getSteps().remove(draggedStep);
+                    sourceTour.removeStep(draggedStep);
                     // 如果是同一个tour并且原index < 目标index，插入点要-1
                     if (sourceTour == targetTour && oldIndex < targetIndex) {
                         targetIndex--;
@@ -348,7 +356,7 @@ public class ToolPaneWindow {
                     if (!isAbove) {
                         targetIndex++;
                     }
-                    targetTour.getSteps().add(targetIndex, draggedStep);
+                    targetTour.addStep(targetIndex, draggedStep);
 
                     StateManager.getInstance().getState(project).updateTour(sourceTour);
                     StateManager.getInstance().getState(project).updateTour(targetTour);
@@ -526,7 +534,7 @@ public class ToolPaneWindow {
 
         } else if (userObject instanceof TourFolder) {
             nodePath = currentPath + ((TourFolder) userObject).getVirtualFile().getPath();
-        } else if (userObject instanceof String && TREE_TITLE.equals(userObject)) {
+        } else if (TREE_TITLE.equals(userObject)) {
             nodePath = TREE_TITLE;
         } else {
             return;
@@ -555,9 +563,9 @@ public class ToolPaneWindow {
             LOG.info("Previous button pressed!");
 
             // Navigate to the previous Step if exist
-            StateManager.getInstance().getActiveTour(project).ifPresent(tour ->
-                    StateManager.getInstance().getState(project).getPrevStep().ifPresent(step ->
-                            selectTourStep(tour, StateManager.getInstance().getActiveStepIndex(project))));
+            StateManager.getInstance().getActiveTour(project)
+                    .flatMap(tour -> StateManager.getInstance().getState(project).getPrevStep())
+                    .ifPresent(this::selectTourStep);
 
         });
 
@@ -567,9 +575,9 @@ public class ToolPaneWindow {
             LOG.info("Next button pressed!");
 
             // Navigate to the next Step if exist
-            StateManager.getInstance().getActiveTour(project).ifPresent(tour ->
-                    StateManager.getInstance().getState(project).getNextStep().ifPresent(step ->
-                            selectTourStep(tour, StateManager.getInstance().getState(project).getActiveStepIndex())));
+            StateManager.getInstance().getActiveTour(project)
+                    .flatMap(tour -> StateManager.getInstance().getState(project).getNextStep())
+                    .ifPresent(this::selectTourStep);
         });
 
         final JButton reloadButton = new JButton("Reload");
@@ -705,7 +713,8 @@ public class ToolPaneWindow {
         final int index = parentNode.getIndex(node);
         if (index >= 0)
             StateManager.getInstance().getState(project).setActiveStepIndex(index);
-        Navigator.navigateLine(step, project, this::createOrUpdateContent);
+        createOrUpdateContent(step, project);
+        Navigator.navigateLine(step, project);
     }
 
     private void folderClickListener(MouseEvent e, DefaultMutableTreeNode node) {
@@ -854,7 +863,7 @@ public class ToolPaneWindow {
             if (!okSelected) return; // i.e. cancel the step creation
 
             final Step updatedStep = stepEditor.getUpdatedStep();
-            tour.getSteps().add(updatedStep);
+            tour.addStep(updatedStep);
             StateManager.getInstance().getState(project).updateTour(tour);
 
             // Notify UI to re-render
@@ -878,7 +887,7 @@ public class ToolPaneWindow {
                 String.format("Tour's '%s' Title has been updated", tour.getTitle()));
 
         // Expand and select the first Step of the active Tour on the tree
-        selectTourStep(tour, tour.getSteps().isEmpty() ? -1 : 0, false);
+        selectTourStep(tour.getSteps().get(tour.getSteps().isEmpty() ? -1 : 0), false);
     }
 
     private void jumpToSourceTourListener(Tour tour) {
@@ -924,45 +933,42 @@ public class ToolPaneWindow {
         if (!okSelected || !stepEditor.isDirty()) return;
 
         final Step updatedStep = stepEditor.getUpdatedStep();
-        tour.getSteps().set(index, updatedStep);
+        tour.addStep(index, updatedStep);
 
         StateManager.getInstance().getState(project).updateTour(tour);
         CodeTourNotifier.notifyTourAction(project, tour, "Step Update",
                 String.format("Step '%s' has been updated", step.getTitle()));
-        project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(tour);
-
-        // Expand and select the Step on the tree
-        selectTourStep(tour, index, false);
+        project.getMessageBus().syncPublisher(StepSelectionNotifier.TOPIC).selectStep(step);
     }
 
     private void moveListener(Step step, Tour tour, boolean up) {
         final int index = tour.getSteps().indexOf(step);
         final int newIndex = up ? index - 1 : index + 1;
-        tour.getSteps().remove(index);
+        tour.removeStep(index);
         if (tour.getSteps().size() <= newIndex || newIndex < 0)
             CodeTourNotifier.error(project, String.format("Cannot move Step '%s' %s!",
                     step.getTitle(), up ? "up" : "down"));
 
-        tour.getSteps().add(newIndex, step);
+        tour.addStep(newIndex, step);
 
         StateManager.getInstance().getState(project).updateTour(tour);
         updateToursTree();
         CodeTourNotifier.notifyTourAction(project, tour, "Steps Order Update", "Steps have been re-arranged!");
 
         // Expand and select the last Step of the active Tour on the tree
-        selectTourStep(tour, newIndex, false);
+        selectTourStep(step, false);
     }
 
     private void deleteStepListener(Step step, Tour tour) {
         final int index = tour.getSteps().indexOf(step);
-        tour.getSteps().remove(index);
+        tour.removeStep(index);
         StateManager.getInstance().getState(project).updateTour(tour);
         updateToursTree();
         CodeTourNotifier.notifyTourAction(project, tour, "Step Deletion", String.format("Step " +
                 "'%s' has been removed from Tour '%s'", step.getTitle(), tour.getTitle()));
         project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(tour);
         // Expand and select a Step on the tree (on the same index)
-        selectTourStep(tour, Math.min(tour.getSteps().size() - 1, index), false);
+        selectTourStep(tour.getSteps().get(Math.min(tour.getSteps().size() - 1, index)), false);
     }
     //endregion
 
@@ -976,41 +982,59 @@ public class ToolPaneWindow {
         }
     }
 
-    private void selectTourLastStep(Tour tour) {
-        selectTourStep(tour, 0);
+    private void selectTourStep(Step step) {
+        selectTourStep(step, false);
     }
 
-    private void selectTourStep(Tour tour, int activeStepIndex) {
-        selectTourStep(tour, activeStepIndex, true);
+    private void selectTourStep(Step step, boolean navigate) {
+        if (expandAndSelectStep(step)) {
+            createOrUpdateContent(step, project);
+            // Also navigate to that step (if set)
+            if (navigate) {
+                Navigator.navigateLine(step, project);
+            }
+        }
     }
 
-    private void selectTourStep(Tour tour, int activeStepIndex, boolean navigate) {
+    /**
+     * 展开并选中对应step
+     *
+     * @param step step
+     * @return 是否展开
+     */
+    private boolean expandAndSelectStep(Step step) {
         // Expand and select the given or the last Step of the active Tour on the tree
-        for (int i = 0; i < toursTree.getRowCount(); i++) {
-            if (!toursTree.getPathForRow(i).getLastPathComponent().toString().equals(tour.getTitle())) continue;
+        DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
+        DefaultMutableTreeNode tourNode = findTourNode(root, step);
+        if (tourNode == null) {
+            return false;
+        }
+        toursTree.expandPath(new TreePath(tourNode.getPath()));
+        // If activeIndex is provided, select it
+        final DefaultMutableTreeNode stepNodeToSelect =
+                (DefaultMutableTreeNode) tourNode.getChildAt(step.getStepIndex());
+        TreePath stepTreePath = new TreePath(stepNodeToSelect.getPath());
+        toursTree.getSelectionModel().setSelectionPath(stepTreePath);
+        toursTree.scrollPathToVisible(stepTreePath);
+        return true;
+    }
 
-            final Object component = toursTree.getPathForRow(i).getLastPathComponent();
-            if (component instanceof DefaultMutableTreeNode) {
-                final DefaultMutableTreeNode pNode = (DefaultMutableTreeNode) component;
-                if (pNode.getUserObject() instanceof Tour) {
-                    toursTree.expandPath(new TreePath(pNode.getPath()));
-                    if (activeStepIndex >= 0 && activeStepIndex < toursTree.getRowCount()) {
-                        // If activeIndex is provided, select it
-                        final DefaultMutableTreeNode stepNodeToSelect =
-                                (DefaultMutableTreeNode) pNode.getChildAt(activeStepIndex);
-                        toursTree.getSelectionModel().setSelectionPath(new TreePath(stepNodeToSelect.getPath()));
-                        // Also navigate to that step (if set)
-                        if (navigate)
-                            Navigator.navigateLine((Step) stepNodeToSelect.getUserObject(), project, this::createOrUpdateContent);
-                    } else {
-                        // otherwise, select the last step of the tour Node, and update the selected step index
-                        toursTree.getSelectionModel().setSelectionPath(new TreePath(pNode.getLastLeaf().getPath()));
-                        StateManager.getInstance().getState(project)
-                                .setActiveStepIndex(((Tour) pNode.getUserObject()).getSteps().size() - 1);
-                    }
+    private DefaultMutableTreeNode findTourNode(DefaultMutableTreeNode node, Step step) {
+        if (node.getUserObject() instanceof Tour nodeTour) {
+            if (nodeTour.getTitle().equals(step.getOwner().getTitle())) {
+                return node;
+            }
+        } else if (node.getUserObject() instanceof TourFolder || node.isRoot()) {
+            // 递归处理子节点
+            for (int i = 0; i < node.getChildCount(); i++) {
+                DefaultMutableTreeNode child = (DefaultMutableTreeNode) node.getChildAt(i);
+                DefaultMutableTreeNode tourNode = findTourNode(child, step);
+                if (tourNode != null) {
+                    return tourNode;
                 }
             }
         }
+        return null;
     }
 
     private void reloadToursState() {

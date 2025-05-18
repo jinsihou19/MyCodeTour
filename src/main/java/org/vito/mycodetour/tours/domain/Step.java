@@ -2,6 +2,8 @@ package org.vito.mycodetour.tours.domain;
 
 import com.intellij.psi.PsiNameHelper;
 
+import java.util.Objects;
+
 /**
  * 步骤
  *
@@ -14,8 +16,7 @@ public class Step {
     private String description;
     private String file;
     private Integer line;
-    private String directory;
-    private String uri;
+    private transient Tour owner;
 
     public Step() {
     }
@@ -25,6 +26,14 @@ public class Step {
         this.file = file;
         this.line = line;
         this.title = title;
+    }
+
+    public Step(String description, String file, Integer line, String title, Tour owner) {
+        this.description = description;
+        this.file = file;
+        this.line = line;
+        this.title = title;
+        this.owner = owner;
     }
 
     public String getTitle() {
@@ -63,8 +72,22 @@ public class Step {
         return this;
     }
 
-    public String getDirectory() {
-        return directory;
+    public Tour getOwner() {
+        return owner;
+    }
+
+    public Step setOwner(Tour owner) {
+        this.owner = owner;
+        return this;
+    }
+
+    /**
+     * 获取step的索引
+     *
+     * @return 索引
+     */
+    public int getStepIndex() {
+        return owner.getSteps().indexOf(this);
     }
 
     public String reference() {
@@ -78,6 +101,20 @@ public class Step {
     @Override
     public String toString() {
         return title;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof Step step)) return false;
+        return Objects.equals(title, step.title)
+                && Objects.equals(description, step.description)
+                && Objects.equals(file, step.file)
+                && Objects.equals(line, step.line);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(title, description, file, line);
     }
 
     /**
@@ -128,6 +165,7 @@ public class Step {
         private String description;
         private String file;
         private Integer line;
+        private Tour owner;
 
         private StepBuilder() {
         }
@@ -152,8 +190,13 @@ public class Step {
             return this;
         }
 
+        public StepBuilder tour(Tour owner) {
+            this.owner = owner;
+            return this;
+        }
+
         public Step build() {
-            return new Step(description, file, line, title);
+            return new Step(description, file, line, title, owner);
         }
     }
 }
