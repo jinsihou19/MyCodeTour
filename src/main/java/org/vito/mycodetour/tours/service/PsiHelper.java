@@ -3,8 +3,10 @@ package org.vito.mycodetour.tours.service;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiField;
+import com.intellij.psi.PsiIdentifier;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiParameter;
+import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
@@ -85,5 +87,20 @@ public class PsiHelper {
             reference = PsiHelper.buildFieldReference(psiField);
         }
         return reference;
+    }
+
+    /**
+     * 获取Identifier对应的psiElement引用
+     *
+     * @param psiElement Identifier
+     * @return 引用
+     */
+    @Nullable
+    public static String getIdentifierReference(PsiElement psiElement) {
+        if (psiElement instanceof PsiIdentifier) {
+            PsiElement parent = PsiTreeUtil.getParentOfType(psiElement, PsiClass.class, PsiField.class, PsiMethod.class);
+            return getReference(parent);
+        }
+        return null;
     }
 }

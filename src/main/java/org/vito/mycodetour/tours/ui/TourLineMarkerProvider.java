@@ -122,7 +122,7 @@ public class TourLineMarkerProvider extends LineMarkerProviderDescriptor {
      *   2. fileName:lineNumber（仅文件名）
      */
     private @Nullable String getElementIdentifier(@NotNull PsiElement element) {
-        String reference = PsiHelper.getReference(element);
+        String reference = PsiHelper.getIdentifierReference(element);
         if (StringUtils.isNotEmpty(reference)) {
             return reference;
         }
