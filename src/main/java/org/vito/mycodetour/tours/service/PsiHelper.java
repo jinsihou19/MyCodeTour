@@ -98,7 +98,7 @@ public class PsiHelper {
     @Nullable
     public static String getIdentifierReference(PsiElement psiElement) {
         if (psiElement instanceof PsiIdentifier) {
-            PsiElement parent = PsiTreeUtil.getParentOfType(psiElement, PsiClass.class, PsiField.class, PsiMethod.class);
+            PsiElement parent = psiElement.getParent();
             return getReference(parent);
         }
         return null;
