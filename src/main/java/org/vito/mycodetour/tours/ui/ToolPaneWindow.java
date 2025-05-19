@@ -97,12 +97,10 @@ public class ToolPaneWindow {
         this.project = project;
 
         content = new JPanel(new BorderLayout());
-        splitter = new OnePixelSplitter(true, 0.5f);
+        splitter = new OnePixelSplitter(true, 0.3f);
         content.add(splitter, BorderLayout.CENTER);
 
         createToursTree();
-
-        createNavigationButtons();
 
         registerMessageBusListener();
 
@@ -160,6 +158,20 @@ public class ToolPaneWindow {
                 final TreePath pathSelected = toursTree.getPathForLocation(e.getX(), e.getY());
 
                 if (selectedRow < 0 || pathSelected == null) {
+                    // 在空白处点击时显示上下文菜单
+                    if (e.getButton() == MouseEvent.BUTTON3) {
+                        final JBPopupMenu menu = new JBPopupMenu("Tree Context Menu");
+                        
+                        // Reload Action
+                        final JMenuItem reloadAction = new JMenuItem("Reload", AllIcons.Actions.Refresh);
+                        reloadAction.addActionListener(d -> {
+                            LOG.info("Re-creating the tree");
+                            reloadToursState();
+                        });
+                        
+                        menu.add(reloadAction);
+                        menu.show(toursTree, e.getX(), e.getY());
+                    }
                     return;
                 }
 

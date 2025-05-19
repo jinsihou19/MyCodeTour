@@ -111,8 +111,7 @@ public class Utils {
 
     private static void pageFooterIfNeed(String file, StringBuilder sb) {
         if (StringUtils.isNotEmpty(file)) {
-            sb.append("<hr/>");
-            sb.append(DocumentationMarkup.DEFINITION_START);
+            sb.append("<div class='definition footer'><pre>");
             sb.append("Reference: ");
             sb.append(createLink(file));
             sb.append(DocumentationMarkup.DEFINITION_END);
@@ -170,139 +169,22 @@ public class Utils {
         // 包裹 markdown-body
         html = "<article class=\"markdown-body\">" + html + "</article>";
 
-        // 引入暗黑CSS
-        String darkCss = """
-                    <link rel="stylesheet" href="file:///mycodetour/public/github-markdown-dark.min.css">
-                    <link rel="stylesheet" href="file:///mycodetour/public/github-dark.min.css">
-                    <style>
-                      body, .markdown-body {
-                        background: #23272e !important;
-                        color: #e6e6e6 !important;
-                      }
-                      .mermaid, .mermaid svg, .plantuml, .plantuml svg {
-                        background: transparent !important;
-                        color: #e6e6e6 !important;
-                      }
-                      /* 滚动条美化 */
-                      .markdown-body ::-webkit-scrollbar {
-                        width: 12px;
-                        background: #23272e;
-                      }
-                      .markdown-body ::-webkit-scrollbar-thumb {
-                        background: #444950;
-                        border-radius: 6px;
-                        border: 2px solid #23272e;
-                      }
-                      .markdown-body ::-webkit-scrollbar-thumb:hover {
-                        background: #5c6370;
-                      }
-                      .markdown-body ::-webkit-scrollbar-track {
-                        background: #23272e;
-                      }
-                      ::-webkit-scrollbar {
-                          width: 14.0px;
-                          height: 14.0px;
-                      }
-                
-                      ::-webkit-scrollbar-track {
-                          background-color:
-                                  rgba(128, 128, 128, 0.0);
-                      }
-                
-                      ::-webkit-scrollbar-track:hover {
-                          background-color:rgba(128, 128, 128, 0.0);
-                      }
-                
-                      ::-webkit-scrollbar-thumb {
-                          background-color:
-                                  rgba(255, 255, 255, 0.14901960784313725);
-                          border-radius:14.0px;
-                          border-width: 3.0px;
-                          border-style: solid;
-                          border-color: rgba(128, 128, 128, 0.0);
-                          background-clip: padding-box;
-                          outline: 1px solid rgba(38, 38, 38, 0.34901960784313724);
-                          outline-offset: -3.0px;
-                      }
-                
-                      ::-webkit-scrollbar-thumb:hover {
-                          background-color:rgba(255, 255, 255, 0.30196078431372547);
-                          border-radius:14.0px;
-                          border-width: 3.0px;
-                          border-style: solid;
-                          border-color: rgba(128, 128, 128, 0.0);
-                          background-clip: padding-box;
-                          outline: 1px solid rgba(38, 38, 38, 0.5490196078431373);
-                          outline-offset: -3.0px;
-                      }
-                
-                      ::-webkit-scrollbar-button {
-                          display: none;
-                      }
-                
-                      ::-webkit-scrollbar-corner {
-                          background-color: rgba(63, 68, 66, 1.0);
-                      }
-                    </style>
-                """;
-
-        // 添加必要的脚本
-        StringBuilder scripts = new StringBuilder();
 
         // 添加 highlight.js
-        scripts.append("""
+        String scripts = """
+                    <link rel="stylesheet" href="file:///mycodetour/public/github-markdown-dark.min.css">
+                    <link rel="stylesheet" href="file:///mycodetour/public/github-dark.min.css">
+                    <link rel="stylesheet" href="file:///mycodetour/public/index.css">
                     <script src="file:///mycodetour/public/highlight.js/11.9.0/highlight.min.js"></script>
                     <script src="file:///mycodetour/public/highlight.js/11.9.0/languages/java.min.js"></script>
                     <script src="file:///mycodetour/public/highlight.js/11.9.0/languages/javascript.min.js"></script>
                     <script src="file:///mycodetour/public/highlight.js/11.9.0/languages/python.min.js"></script>
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function() {
-                            hljs.configure({
-                                languages: ['java', 'javascript', 'python', 'xml', 'html', 'css', 'json', 'bash', 'shell']
-                            });
-                            document.querySelectorAll('pre code').forEach((block) => {
-                                hljs.highlightElement(block);
-                            });
-                        });
-                    </script>
-                """);
+                    <script src="file:///mycodetour/public/mermaid.min.js"></script>
+                    <script src="file:///mycodetour/public/plantuml-encoder.min.js"></script>
+                    <script src="file:///mycodetour/public/index.js"></script>
+                """;
 
-        if (html.contains("class='mermaid'")) {
-            scripts.append("""
-                        <script src="file:///mycodetour/public/mermaid.min.js"></script>
-                        <script>
-                            document.addEventListener('DOMContentLoaded', function() {
-                                if (typeof mermaid !== 'undefined') {
-                                    mermaid.initialize({
-                                        startOnLoad: true,
-                                        theme: 'dark',
-                                    });
-                                }
-                            });
-                        </script>
-                    """);
-        }
-
-        if (html.contains("class='plantuml'")) {
-            scripts.append("""
-                        <script src="file:///mycodetour/public/plantuml-encoder.min.js"></script>
-                        <script>
-                            document.addEventListener('DOMContentLoaded', function() {
-                                const plantumlElements = document.querySelectorAll('.plantuml');
-                                plantumlElements.forEach(function(element) {
-                                    const encoded = plantumlEncoder.encode(element.textContent);
-                                    const img = document.createElement('img');
-                                    img.src = 'https://www.plantuml.com/plantuml/dsvg/' + encoded;
-                                    img.style.maxWidth = '100%';
-                                    element.innerHTML = '';
-                                    element.appendChild(img);
-                                });
-                            });
-                        </script>
-                    """);
-        }
-
-        html = darkCss + scripts + html;
+        html = scripts + html;
 
         return html;
     }
