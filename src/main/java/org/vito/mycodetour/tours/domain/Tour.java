@@ -156,11 +156,29 @@ public class Tour {
         return this;
     }
 
+    /**
+     * 在指定位置插入一个step
+     *
+     * @param index 索引
+     * @param step  新step
+     * @return tour
+     */
     public Tour addStep(int index, Step step) {
         this.steps.add(index, step.setOwner(this));
         return this;
     }
 
+    /**
+     * 更新为指定step
+     *
+     * @param index 索引
+     * @param step  新step
+     * @return tour
+     */
+    public Tour updateStep(int index, Step step) {
+        this.steps.set(index, step.setOwner(this));
+        return this;
+    }
 
     /**
      * 获取指定index的步骤

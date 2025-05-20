@@ -945,7 +945,7 @@ public class ToolPaneWindow {
         if (!okSelected || !stepEditor.isDirty()) return;
 
         final Step updatedStep = stepEditor.getUpdatedStep();
-        tour.addStep(index, updatedStep);
+        tour.updateStep(index, updatedStep);
 
         StateManager.getInstance().getState(project).updateTour(tour);
         CodeTourNotifier.notifyTourAction(project, tour, "Step Update",
