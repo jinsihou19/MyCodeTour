@@ -5,19 +5,10 @@ import com.intellij.openapi.project.Project;
 import com.intellij.ui.jcef.JBCefBrowser;
 import com.intellij.ui.jcef.JBCefBrowserBase;
 import com.intellij.ui.jcef.JBCefJSQuery;
-import org.cef.browser.CefBrowser;
-import org.cef.browser.CefFrame;
-import org.cef.handler.CefRequestHandlerAdapter;
-import org.cef.handler.CefResourceHandler;
-import org.cef.handler.CefResourceRequestHandler;
-import org.cef.handler.CefResourceRequestHandlerAdapter;
-import org.cef.misc.BoolRef;
-import org.cef.network.CefRequest;
 import org.vito.mycodetour.tours.domain.Step;
-import org.vito.mycodetour.tours.service.ResourceHandler;
 import org.vito.mycodetour.tours.service.TinyTemplateEngine;
+import org.vito.mycodetour.tours.service.Utils;
 
-import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JPanel;
 import java.awt.BorderLayout;
@@ -41,29 +32,7 @@ public class StepEditorPane extends JPanel {
 
     private void init() {
         // 创建编辑器浏览器
-        JBCefBrowser editorBrowser = JBCefBrowser.createBuilder()
-                .setUrl("about:blank")
-                .build();
-        editorBrowser.getJBCefClient().addRequestHandler(new CefRequestHandlerAdapter() {
-            @Override
-            public boolean onOpenURLFromTab(CefBrowser browser, CefFrame frame, String target_url, boolean user_gesture) {
-                return true;
-            }
-
-            @Override
-            public CefResourceRequestHandler getResourceRequestHandler(CefBrowser browser, CefFrame frame, CefRequest request, boolean isNavigation, boolean isDownload, String requestInitiator, BoolRef disableDefaultHandling) {
-                return new CefResourceRequestHandlerAdapter() {
-                    @Override
-                    public CefResourceHandler getResourceHandler(CefBrowser browser, CefFrame frame, CefRequest request) {
-                        String url = request.getURL();
-                        if (url.startsWith("file:///") && !isIndex(url)) {
-                            return new ResourceHandler(project);
-                        }
-                        return null;
-                    }
-                };
-            }
-        }, editorBrowser.getCefBrowser());
+        JBCefBrowser editorBrowser = Utils.createNormalJBCefBrowser(project);
 
         // 创建 JavaScript 查询处理器
         JBCefJSQuery jsQuery = JBCefJSQuery.create((JBCefBrowserBase) editorBrowser);
@@ -83,7 +52,6 @@ public class StepEditorPane extends JPanel {
 
         // 创建工具栏面板
         JPanel toolbarPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        toolbarPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
         // 创建保存按钮
         JButton saveButton = new JButton(AllIcons.Actions.MenuSaveall);
