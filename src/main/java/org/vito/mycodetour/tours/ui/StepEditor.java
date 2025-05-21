@@ -2,7 +2,6 @@ package org.vito.mycodetour.tours.ui;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
-import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.components.JBTextField;
@@ -11,7 +10,6 @@ import com.intellij.ui.jcef.JBCefBrowserBase;
 import com.intellij.ui.jcef.JBCefJSQuery;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
-import com.intellij.util.ui.UIUtil;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 import org.cef.handler.CefRequestHandlerAdapter;
@@ -23,6 +21,7 @@ import org.cef.network.CefRequest;
 import org.jetbrains.annotations.NotNull;
 import org.vito.mycodetour.tours.domain.Step;
 import org.vito.mycodetour.tours.service.ResourceHandler;
+import org.vito.mycodetour.tours.service.TinyTemplateEngine;
 import org.vito.mycodetour.tours.state.StateManager;
 
 import javax.swing.Action;
@@ -31,8 +30,7 @@ import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 import javax.swing.SwingConstants;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
+import java.util.Map;
 
 import static org.vito.mycodetour.tours.service.Utils.equalInt;
 import static org.vito.mycodetour.tours.service.Utils.equalStr;
@@ -122,130 +120,16 @@ public class StepEditor extends DialogWrapper {
             return null;
         });
 
-        boolean isDark = !JBColor.isBright() || UIUtil.isUnderIntelliJLaF();
-        String bgColor = isDark ? "#2B2B2B" : "#FFFFFF";
-        String textColor = isDark ? "#A9B7C6" : "#000000";
-        String toolbarBg = isDark ? "#3C3F41" : "#F5F5F5";
-        String borderColor = isDark ? "#515151" : "#E0E0E0";
+        try {
+            String rendered = TinyTemplateEngine.render(
+                    "/public/editor/index.html",
+                    Map.of("editor", jsQuery.inject("easyMDE.value()"),
+                            "markdown", escapeJavaScript(currentMarkdown)));
+            editorBrowser.loadHTML(rendered);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
-        // 初始化编辑器
-        String editorHtml = """
-                <!DOCTYPE html>
-                <html>
-                <head>
-                <meta charset='UTF-8'>
-                <link rel='stylesheet' href='file:///mycodetour/public/easymde.min.css'>
-                <link rel="stylesheet" href="file:///mycodetour/public/github-markdown-dark.min.css">
-                <link rel="stylesheet" href="file:///mycodetour/public/github-dark.min.css">
-                <script src='file:///mycodetour/public/easymde.min.js'></script>
-                <script src='file:///mycodetour/public/marked.min.js'></script>
-                <script src='file:///mycodetour/public/mermaid.min.js'></script>
-                """+
-                "<style>" +
-                "body { margin: 0; padding: 0; background-color: " + bgColor + "; }" +
-                ".EasyMDEContainer { background-color: " + bgColor + "; }" +
-                ".editor-toolbar { border-width: 0 !important; background-color: " + toolbarBg + " !important;}" +
-                ".editor-toolbar button { color: " + textColor + " !important; }" +
-                ".editor-toolbar button:hover { background-color: #3C3F41 !important; }" +
-                ".editor-toolbar button.active { background-color: #3C3F41 !important; }" +
-                ".CodeMirror { background-color: " + bgColor + " !important; color: " + textColor + " !important; border-width: 0 !important;}" +
-                ".CodeMirror-gutters { background-color: #313335 !important; border-color: " + borderColor + " !important; }" +
-                ".CodeMirror-linenumber { color: #606366 !important; }" +
-                ".CodeMirror-cursor { border-left: 1px solid " + textColor + " !important; }" +
-                ".CodeMirror-selected { background-color: #3A3D41 !important; }" +
-                ".CodeMirror-focused .CodeMirror-selected { background-color: #3A3D41 !important; }" +
-                ".editor-preview, .editor-preview-side { background-color: " + bgColor + " !important; color: " + textColor + " !important; }" +
-                ".markdown-body { background-color: " + bgColor + " !important; }" +
-                """
-                        ::-webkit-scrollbar {
-                            width: 14.0px;
-                            height: 14.0px;
-                            background-color: rgba(63, 68, 66, 1.0);
-                        }
-                        
-                        ::-webkit-scrollbar-track {
-                            background-color:
-                                    rgba(128, 128, 128, 0.0);
-                        }
-                        
-                        ::-webkit-scrollbar-track:hover {
-                            background-color:rgba(128, 128, 128, 0.0);
-                        }
-                        
-                        ::-webkit-scrollbar-thumb {
-                            background-color:
-                                    rgba(255, 255, 255, 0.14901960784313725);
-                            border-radius:14.0px;
-                            border-width: 3.0px;
-                            border-style: solid;
-                            border-color: rgba(128, 128, 128, 0.0);
-                            background-clip: padding-box;
-                            outline: 1px solid rgba(38, 38, 38, 0.34901960784313724);
-                            outline-offset: -3.0px;
-                        }
-                        
-                        ::-webkit-scrollbar-thumb:hover {
-                            background-color:rgba(255, 255, 255, 0.30196078431372547);
-                            border-radius:14.0px;
-                            border-width: 3.0px;
-                            border-style: solid;
-                            border-color: rgba(128, 128, 128, 0.0);
-                            background-clip: padding-box;
-                            outline: 1px solid rgba(38, 38, 38, 0.5490196078431373);
-                            outline-offset: -3.0px;
-                        }
-                        
-                        ::-webkit-scrollbar-button {
-                            display:
-                                    none;
-                        }
-                        
-                        ::-webkit-scrollbar-corner {
-                            background-color: rgba(63, 68, 66, 1.0);
-                        }
-                        """ +
-                "</style>" +
-                "</head>" +
-                "<body>" +
-                "<textarea id='editor'></textarea>" +
-                "<script>" +
-                "mermaid.initialize({ " +
-                "  startOnLoad: true, " +
-                "  theme: 'dark', " +
-                "});" +
-                "var initialValue = '" + escapeJavaScript(currentMarkdown) + "';" +
-                """
-                            var easyMDE = new EasyMDE({
-                                element: document.getElementById('editor'),
-                                initialValue: initialValue,
-                                autofocus: true,
-                                spellChecker: false,
-                                status: false,
-                                insertTexts: {
-                                    link: ["[", "](navigate://)"],
-                                },
-                                toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', 'clean-block', 'table', 'code', '|', 'link', 'image', '|', 'undo', 'redo', 'fullscreen'],
-                                previewRender: function (plainText) {
-                                    var preview = document.createElement('div');
-                                    preview.className = 'markdown-body';
-                                    preview.innerHTML = marked.parse(plainText);
-                                    mermaid.init(undefined, preview.querySelectorAll('language-mermaid'));
-                                    return preview.innerHTML;
-                                },
-                                renderingConfig: {
-                                    codeSyntaxHighlighting: true,
-                                }
-                            });
-                        """ +
-                "easyMDE.codemirror.on('change', function() {" +
-                "  " + jsQuery.inject("easyMDE.value()") + ";" +
-                "});" +
-                "</script>" +
-                "</body>" +
-                "</html>";
-
-        String encodedHtml = Base64.getEncoder().encodeToString(editorHtml.getBytes(StandardCharsets.UTF_8));
-        editorBrowser.loadHTML(editorHtml);
 
         final JBScrollPane editorPane = new JBScrollPane(editorBrowser.getComponent());
 

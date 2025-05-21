@@ -127,7 +127,7 @@ public class Step {
 
         return Step.builder()
                 .title(PsiNameHelper.getShortClassName(reference))
-                .description("Simple Navigation to " + reference)
+                .description("Simple Navigation to [[" + reference + "]]")
                 .file(reference)
                 .build();
     }
@@ -135,21 +135,21 @@ public class Step {
     /**
      * 创建step
      *
-     * @param reference 引用，可能是文件也可能是方法类引用
-     * @param line      行数
+     * @param fileName 文件名
+     * @param line     行数
      * @return step
      */
-    public static Step with(String reference, int line) {
-        final String title = reference.contains("/")
-                ? reference.substring(reference.lastIndexOf("/") + 1)
+    public static Step with(String fileName, int line) {
+        final String title = fileName.contains("/")
+                ? fileName.substring(fileName.lastIndexOf("/") + 1)
                 : String.format(
-                    "%s:%s",
-                    PsiNameHelper.getShortClassName(reference.replace(".java", "")),
-                    line);
+                "%s:%s",
+                PsiNameHelper.getShortClassName(fileName.replace(".java", "")),
+                line);
         return Step.builder()
                 .title(title)
-                .description("Simple Navigation to " + title)
-                .file(reference)
+                .description(String.format("Simple Navigation to [[%s:%s]]", fileName, line))
+                .file(fileName)
                 .line(line)
                 .build();
     }

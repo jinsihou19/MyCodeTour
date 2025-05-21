@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='UTF-8'>
+    <link rel='stylesheet' href='file:///mycodetour/public/editor/easymde.min.css'>
+    <link rel="stylesheet" href="file:///mycodetour/public/github-markdown-dark.min.css">
+    <link rel="stylesheet" href="file:///mycodetour/public/github-dark.min.css">
+    <link rel="stylesheet" href="file:///mycodetour/public/editor/index.css">
+    <script src='file:///mycodetour/public/editor/easymde.min.js'></script>
+    <script src='file:///mycodetour/public/marked.min.js'></script>
+    <script src='file:///mycodetour/public/mermaid.min.js'></script>
+    <script src="file:///mycodetour/public/editor/index.js"></script>
+    <title>editor</title>
+</head>
+<body>
+<textarea id='editor'></textarea>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const easyMDE = new EasyMDE({
+            element: document.getElementById('editor'),
+            initialValue: "${markdown}",
+            autofocus: true,
+            spellChecker: false,
+            status: false,
+            insertTexts: {
+                link: ["[", "](navigate://)"],
+            },
+            toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', 'clean-block', 'table', 'code', '|', 'link', 'image', '|', 'undo', 'redo', 'fullscreen', 'preview'],
+            previewRender:  (plainText) => {
+                var preview = document.createElement('div');
+                preview.className = 'markdown-body';
+                preview.innerHTML = marked.parse(plainText);
+                mermaid.init(undefined, preview.querySelectorAll('language-mermaid'));
+                return preview.innerHTML;
+            },
+            renderingConfig: {
+                codeSyntaxHighlighting: true,
+            },
+            previewClass: 'markdown-body',
+        });
+        easyMDE.codemirror.on('change', ()=> {
+            ${editor}
+        });
+    })
+</script>
+</body>
+</html>

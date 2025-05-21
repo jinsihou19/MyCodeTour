@@ -950,7 +950,7 @@ public class ToolPaneWindow {
         StateManager.getInstance().getState(project).updateTour(tour);
         CodeTourNotifier.notifyTourAction(project, tour, "Step Update",
                 String.format("Step '%s' has been updated", step.getTitle()));
-        project.getMessageBus().syncPublisher(StepSelectionNotifier.TOPIC).selectStep(step);
+        project.getMessageBus().syncPublisher(StepSelectionNotifier.TOPIC).selectStep(updatedStep);
     }
 
     private void moveListener(Step step, Tour tour, boolean up) {

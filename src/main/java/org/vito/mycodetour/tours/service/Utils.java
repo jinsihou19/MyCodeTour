@@ -1,6 +1,7 @@
 package org.vito.mycodetour.tours.service;
 
 import com.intellij.lang.documentation.DocumentationMarkup;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.psi.PsiNameHelper;
 import org.apache.commons.lang3.StringUtils;
 import org.intellij.markdown.ast.ASTNode;
@@ -11,6 +12,12 @@ import org.intellij.markdown.parser.MarkdownParser;
 import org.jetbrains.annotations.NotNull;
 import org.vito.mycodetour.tours.domain.Props;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
@@ -20,6 +27,8 @@ import java.util.regex.Pattern;
  * Created on 2025/1/1
  */
 public class Utils {
+
+    private static final Logger LOG = Logger.getInstance(Utils.class);
 
     public static final Pattern WIKI_LINK = Pattern.compile("\\[\\[([^]]+)]]");
 
@@ -166,27 +175,8 @@ public class Utils {
             );
         }
 
-        // 包裹 markdown-body
-        html = "<article class=\"markdown-body\">" + html + "</article>";
-
-
-        // 添加 highlight.js
-        String scripts = """
-                    <link rel="stylesheet" href="file:///mycodetour/public/github-markdown-dark.min.css">
-                    <link rel="stylesheet" href="file:///mycodetour/public/github-dark.min.css">
-                    <link rel="stylesheet" href="file:///mycodetour/public/index.css">
-                    <script src="file:///mycodetour/public/highlight.js/11.9.0/highlight.min.js"></script>
-                    <script src="file:///mycodetour/public/highlight.js/11.9.0/languages/java.min.js"></script>
-                    <script src="file:///mycodetour/public/highlight.js/11.9.0/languages/javascript.min.js"></script>
-                    <script src="file:///mycodetour/public/highlight.js/11.9.0/languages/python.min.js"></script>
-                    <script src="file:///mycodetour/public/mermaid.min.js"></script>
-                    <script src="file:///mycodetour/public/plantuml-encoder.min.js"></script>
-                    <script src="file:///mycodetour/public/index.js"></script>
-                """;
-
-        html = scripts + html;
-
-        return html;
+        return TinyTemplateEngine.render("/public/index.html",
+                Map.of("markdownHtml", html));
     }
 
     private static String createLink(String value) {
@@ -208,5 +198,25 @@ public class Utils {
         return s != null ? s : def;
     }
 
+    /**
+     * 读取文件
+     *
+     * @param filePath 文件路径
+     * @return 内容
+     */
+    public static String readFile(String filePath) {
+        try (InputStream is = Utils.class.getResourceAsStream(filePath);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
 
+            StringBuilder content = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                content.append(line).append("\n");
+            }
+            return content.toString();
+        } catch (IOException e) {
+            LOG.error(e);
+        }
+        return "";
+    }
 }
