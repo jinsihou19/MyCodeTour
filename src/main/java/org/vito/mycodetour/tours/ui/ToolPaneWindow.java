@@ -87,12 +87,13 @@ public class ToolPaneWindow {
     private final OnePixelSplitter splitter;
     private Tree toursTree;
     private DefaultTreeModel treeModel;
+    private boolean isEditMode = false;
+    private Step currentStep = null;
 
     private final ToolWindow toolWindow;
     private final Project project;
 
     public ToolPaneWindow(@NotNull Project project, @NotNull ToolWindow toolWindow) {
-
         this.toolWindow = toolWindow;
         this.project = project;
 
@@ -101,6 +102,8 @@ public class ToolPaneWindow {
         content.add(splitter, BorderLayout.CENTER);
 
         createToursTree();
+
+        createNavigationButtons();
 
         registerMessageBusListener();
 
@@ -161,14 +164,14 @@ public class ToolPaneWindow {
                     // 在空白处点击时显示上下文菜单
                     if (e.getButton() == MouseEvent.BUTTON3) {
                         final JBPopupMenu menu = new JBPopupMenu("Tree Context Menu");
-                        
+
                         // Reload Action
                         final JMenuItem reloadAction = new JMenuItem("Reload", AllIcons.Actions.Refresh);
                         reloadAction.addActionListener(d -> {
                             LOG.info("Re-creating the tree");
                             reloadToursState();
                         });
-                        
+
                         menu.add(reloadAction);
                         menu.show(toursTree, e.getX(), e.getY());
                     }
@@ -564,13 +567,29 @@ public class ToolPaneWindow {
     }
 
     private void createOrUpdateContent(@NotNull Step step, @NotNull Project project) {
-        StepRendererPane pane = new StepRendererPane(step, project);
-        splitter.setSecondComponent(pane);
+        currentStep = step;
+        if (isEditMode) {
+            splitter.setSecondComponent(new StepEditorPane(project, step, () -> {
+                isEditMode = false;
+                createOrUpdateContent(currentStep, project);
+            }));
+            // 在编辑模式下隐藏导航按钮
+            content.removeAll();
+            content.add(splitter, BorderLayout.CENTER);
+        } else {
+            splitter.setSecondComponent(new StepRendererPane(step, project));
+            // 在查看模式下显示导航按钮
+            content.removeAll();
+            content.add(splitter, BorderLayout.CENTER);
+            content.add(createNavigationButtons(), BorderLayout.SOUTH);
+        }
     }
 
-    private void createNavigationButtons() {
-        final JButton previousButton = new JButton("Previous Step");
-        previousButton.setToolTipText("Navigate to the Previous Step of the active Tour (Ctrl+Alt+Q)");
+    private JPanel createNavigationButtons() {
+        final JPanel buttonsPanel = new JPanel();
+
+        final JButton previousButton = new JButton(AllIcons.Actions.Back);
+        previousButton.setToolTipText("Navigate to the Previous Step of the active Tour");
         previousButton.addActionListener(e -> {
             LOG.info("Previous button pressed!");
 
@@ -581,8 +600,8 @@ public class ToolPaneWindow {
 
         });
 
-        final JButton nextButton = new JButton("Next Step");
-        nextButton.setToolTipText("Navigate to the Next Step of the active Tour (Ctrl+Alt+W)");
+        final JButton nextButton = new JButton(AllIcons.Actions.Forward);
+        nextButton.setToolTipText("Navigate to the Next Step of the active Tour");
         nextButton.addActionListener(e -> {
             LOG.info("Next button pressed!");
 
@@ -592,18 +611,26 @@ public class ToolPaneWindow {
                     .ifPresent(this::selectTourStep);
         });
 
-        final JButton reloadButton = new JButton("Reload");
+        final JButton reloadButton = new JButton(AllIcons.Actions.Restart);
         reloadButton.setToolTipText("Reload the tours from the related files");
         reloadButton.addActionListener(e -> {
             LOG.info("Re-creating the tree");
             reloadToursState();
         });
 
-        final JPanel buttonsPanel = new JPanel();
+        final JButton editButton = new JButton(AllIcons.Actions.Edit);
+        editButton.setToolTipText("Edit the current Step");
+        editButton.addActionListener(e -> {
+            isEditMode = true;
+            createOrUpdateContent(currentStep, project);
+        });
+
         buttonsPanel.add(previousButton);
         buttonsPanel.add(nextButton);
         buttonsPanel.add(reloadButton);
-        content.add(buttonsPanel, BorderLayout.SOUTH);
+        buttonsPanel.add(editButton);
+
+        return buttonsPanel;
     }
 
     //region Tree Nodes listeners

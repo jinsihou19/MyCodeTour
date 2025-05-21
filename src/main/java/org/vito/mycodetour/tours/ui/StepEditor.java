@@ -10,18 +10,10 @@ import com.intellij.ui.jcef.JBCefBrowserBase;
 import com.intellij.ui.jcef.JBCefJSQuery;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
-import org.cef.browser.CefBrowser;
-import org.cef.browser.CefFrame;
-import org.cef.handler.CefRequestHandlerAdapter;
-import org.cef.handler.CefResourceHandler;
-import org.cef.handler.CefResourceRequestHandler;
-import org.cef.handler.CefResourceRequestHandlerAdapter;
-import org.cef.misc.BoolRef;
-import org.cef.network.CefRequest;
 import org.jetbrains.annotations.NotNull;
 import org.vito.mycodetour.tours.domain.Step;
-import org.vito.mycodetour.tours.service.ResourceHandler;
 import org.vito.mycodetour.tours.service.TinyTemplateEngine;
+import org.vito.mycodetour.tours.service.Utils;
 import org.vito.mycodetour.tours.state.StateManager;
 
 import javax.swing.Action;
@@ -50,11 +42,9 @@ public class StepEditor extends DialogWrapper {
 
     private JBTextField titleTextField;
     private JBTextField referenceTextField;
-    private JBCefBrowser editorBrowser;
     private JBCefBrowser previewBrowser;
     private String stepDoc;
     private String currentMarkdown;
-    private JBCefJSQuery jsQuery;
 
     public StepEditor(Project project, Step step) {
         super(project);
@@ -85,35 +75,10 @@ public class StepEditor extends DialogWrapper {
 
     private JComponent createEditorPanel() {
         // 创建编辑器浏览器
-        editorBrowser = JBCefBrowser.createBuilder()
-                .setUrl("about:blank")
-                .build();
-
-        editorBrowser.getJBCefClient().addRequestHandler(new CefRequestHandlerAdapter() {
-
-            @Override
-            public boolean onOpenURLFromTab(CefBrowser browser, CefFrame frame, String target_url, boolean user_gesture) {
-                return true;
-            }
-
-            @Override
-            public CefResourceRequestHandler getResourceRequestHandler(CefBrowser browser, CefFrame frame, CefRequest request, boolean isNavigation, boolean isDownload, String requestInitiator, BoolRef disableDefaultHandling) {
-                return new CefResourceRequestHandlerAdapter() {
-                    @Override
-                    public CefResourceHandler getResourceHandler(CefBrowser browser, CefFrame frame, CefRequest request) {
-                        String url = request.getURL();
-                        if (url.startsWith("file:///") && !isIndex(url)) {
-                            return new ResourceHandler(project);
-                        }
-                        // 放行非必要处理请求
-                        return null;
-                    }
-                };
-            }
-        }, editorBrowser.getCefBrowser());
+        JBCefBrowser editorBrowser = Utils.createNormalJBCefBrowser(project);
 
         // 创建 JavaScript 查询处理器
-        jsQuery = JBCefJSQuery.create((JBCefBrowserBase) editorBrowser);
+        JBCefJSQuery jsQuery = JBCefJSQuery.create((JBCefBrowserBase) editorBrowser);
         jsQuery.addHandler((query) -> {
             currentMarkdown = query;
             updatePreviewComponent();
@@ -175,32 +140,7 @@ public class StepEditor extends DialogWrapper {
                 currentMarkdown,
                 referenceTextField.getText());
 
-        previewBrowser = JBCefBrowser.createBuilder()
-                .setUrl("about:blank")
-                .build();
-
-        previewBrowser.getJBCefClient().addRequestHandler(new CefRequestHandlerAdapter() {
-
-            @Override
-            public boolean onOpenURLFromTab(CefBrowser browser, CefFrame frame, String target_url, boolean user_gesture) {
-                return true;
-            }
-
-            @Override
-            public CefResourceRequestHandler getResourceRequestHandler(CefBrowser browser, CefFrame frame, CefRequest request, boolean isNavigation, boolean isDownload, String requestInitiator, BoolRef disableDefaultHandling) {
-                return new CefResourceRequestHandlerAdapter() {
-                    @Override
-                    public CefResourceHandler getResourceHandler(CefBrowser browser, CefFrame frame, CefRequest request) {
-                        String url = request.getURL();
-                        if (url.startsWith("file:///") && !isIndex(url)) {
-                            return new ResourceHandler(project);
-                        }
-                        // 放行非必要处理请求
-                        return null;
-                    }
-                };
-            }
-        }, previewBrowser.getCefBrowser());
+        previewBrowser = Utils.createNormalJBCefBrowser(project);
 
         updatePreviewContent();
 
@@ -212,9 +152,6 @@ public class StepEditor extends DialogWrapper {
         return panel;
     }
 
-    private boolean isIndex(String url) {
-        return url.startsWith("file:///jbcefbrowser/") && url.endsWith("url=about:blank");
-    }
 
     private void updatePreviewComponent() {
         stepDoc = renderFullDoc(

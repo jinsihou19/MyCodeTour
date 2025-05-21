@@ -2,8 +2,18 @@ package org.vito.mycodetour.tours.service;
 
 import com.intellij.lang.documentation.DocumentationMarkup;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiNameHelper;
+import com.intellij.ui.jcef.JBCefBrowser;
 import org.apache.commons.lang3.StringUtils;
+import org.cef.browser.CefBrowser;
+import org.cef.browser.CefFrame;
+import org.cef.handler.CefRequestHandlerAdapter;
+import org.cef.handler.CefResourceHandler;
+import org.cef.handler.CefResourceRequestHandler;
+import org.cef.handler.CefResourceRequestHandlerAdapter;
+import org.cef.misc.BoolRef;
+import org.cef.network.CefRequest;
 import org.intellij.markdown.ast.ASTNode;
 import org.intellij.markdown.flavours.MarkdownFlavourDescriptor;
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor;
@@ -218,5 +228,39 @@ public class Utils {
             LOG.error(e);
         }
         return "";
+    }
+
+    public static JBCefBrowser createNormalJBCefBrowser(Project project) {
+        JBCefBrowser previewBrowser = JBCefBrowser.createBuilder()
+                .setUrl("about:blank")
+                .build();
+
+        previewBrowser.getJBCefClient().addRequestHandler(new CefRequestHandlerAdapter() {
+
+            @Override
+            public boolean onOpenURLFromTab(CefBrowser browser, CefFrame frame, String target_url, boolean user_gesture) {
+                return true;
+            }
+
+            @Override
+            public CefResourceRequestHandler getResourceRequestHandler(CefBrowser browser, CefFrame frame, CefRequest request, boolean isNavigation, boolean isDownload, String requestInitiator, BoolRef disableDefaultHandling) {
+                return new CefResourceRequestHandlerAdapter() {
+                    @Override
+                    public CefResourceHandler getResourceHandler(CefBrowser browser, CefFrame frame, CefRequest request) {
+                        String url = request.getURL();
+                        if (url.startsWith("file:///") && !isIndex(url)) {
+                            return new ResourceHandler(project);
+                        }
+                        // 放行非必要处理请求
+                        return null;
+                    }
+                };
+            }
+        }, previewBrowser.getCefBrowser());
+        return previewBrowser;
+    }
+
+    private static boolean isIndex(String url) {
+        return url.startsWith("file:///jbcefbrowser/") && url.endsWith("url=about:blank");
     }
 }
