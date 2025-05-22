@@ -32,9 +32,22 @@ body {
 }
 
 
-.mermaid, .mermaid svg, .plantuml, .plantuml svg {
+.mermaid, .mermaid svg, .plantuml, .plantuml svg, .excalidraw, .excalidraw svg {
     background: transparent !important;
     color: #e6e6e6 !important;
+}
+
+.excalidraw {
+    margin: 1em 0;
+    border: 1px solid #444950;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.excalidraw svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
 }
 
 /* 滚动条美化 */

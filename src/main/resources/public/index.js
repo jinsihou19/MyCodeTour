@@ -20,4 +20,50 @@ document.addEventListener('DOMContentLoaded', function () {
         element.innerHTML = '';
         element.appendChild(img);
     });
+
+    // 处理Excalidraw文件
+    const excalidrawElements = document.querySelectorAll('.excalidraw');
+    excalidrawElements.forEach(async function (element) {
+        const excalidrawString = element.getAttribute('data-src');
+        try {
+            // const response = await fetch(`file:///${src}`);
+            const excalidrawData = JSON.parse(excalidrawString)
+
+            // 创建容器
+            const container = document.createElement('div');
+            container.style.width = '100%';
+            container.style.height = '100%';
+            container.style.background = '#1e1e1e';
+            container.style.display = 'flex';
+            container.style.alignItems = 'center';
+            container.style.justifyContent = 'center';
+            element.appendChild(container);
+            debugger
+
+            // 直接显示SVG内容
+            if (excalidrawData.svg) {
+                container.innerHTML = excalidrawData.svg;
+            } else {
+                // 渲染Excalidraw
+                const {exportToSvg} = window.excalidrawLib;
+                const svg = await exportToSvg({
+                    elements: excalidrawData.elements || [],
+                    appState:  {
+                        theme: "dark",
+                    },
+                    files: excalidrawData.files || {},
+                    exportPadding: 10,
+                    exportWithBackground: true,
+                    exportWithDarkMode: true,
+                });
+                // 设置SVG样式
+                svg.style.width = '100%';
+                svg.style.height = '100%';
+                container.appendChild(svg);
+            }
+        } catch (error) {
+            console.error('Error loading Excalidraw:', error);
+            element.innerHTML = `<div style="color: red; padding: 20px; text-align: center;">Error loading Excalidraw: ${error.message}</div>`;
+        }
+    });
 });

@@ -8,6 +8,7 @@ import com.intellij.ui.jcef.JBCefJSQuery;
 import org.vito.mycodetour.tours.domain.Step;
 import org.vito.mycodetour.tours.service.TinyTemplateEngine;
 import org.vito.mycodetour.tours.service.Utils;
+import org.vito.mycodetour.tours.state.StateManager;
 
 import javax.swing.JButton;
 import javax.swing.JPanel;
@@ -76,5 +77,6 @@ public class StepEditorPane extends JPanel {
 
     private void saveChanges() {
         step.setDescription(currentMarkdown.trim());
+        StateManager.getInstance().getState(project).updateTour(step.getOwner());
     }
 }

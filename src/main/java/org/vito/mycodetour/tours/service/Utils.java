@@ -3,6 +3,9 @@ package org.vito.mycodetour.tours.service;
 import com.intellij.lang.documentation.DocumentationMarkup;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.PsiNameHelper;
 import com.intellij.ui.jcef.JBCefBrowser;
 import org.apache.commons.lang3.StringUtils;
@@ -23,6 +26,7 @@ import org.jetbrains.annotations.NotNull;
 import org.vito.mycodetour.tours.domain.Props;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -41,6 +45,7 @@ public class Utils {
     private static final Logger LOG = Logger.getInstance(Utils.class);
 
     public static final Pattern WIKI_LINK = Pattern.compile("\\[\\[([^]]+)]]");
+    public static final Pattern EXCALIDRAW_LINK = Pattern.compile("!\\[\\[([^]]+)\\.excalidraw]]");
 
     /**
      * Custom TagRenderer for md to html, as for some strange reason there is no default implementation now
@@ -143,6 +148,21 @@ public class Utils {
         String processedMarkdown = markdown;
         // 预处理 ![[]] 语法
         if (processedMarkdown.contains("![[")) {
+            processedMarkdown = EXCALIDRAW_LINK.matcher(processedMarkdown).replaceAll(matchResult -> {
+                String group = matchResult.group(1);
+                Project[] openProjects = ProjectManager.getInstance().getOpenProjects();
+                VirtualFile resourceFile = VirtualFileManager.getInstance().findFileByNioPath(new File(openProjects[0].getBasePath() + "/" + group + ".excalidraw").toPath());
+                if (resourceFile == null) {
+                    return "<div class='excalidraw' data-src='$1.excalidraw'></div>";
+                }
+                try {
+                    String s = readFile(resourceFile.getInputStream());
+                    return String.format("<div class='excalidraw' data-src='%s'></div>", s);
+                } catch (IOException e) {
+                    LOG.error(e);
+                    return "<div class='excalidraw' data-src='$1.excalidraw'></div>";
+                }
+            });
             processedMarkdown = processedMarkdown.replaceAll(
                     "!\\[\\[([^]]+)]]",
                     "<img src=\"file:///$1\" alt=\"$1\">"
@@ -207,6 +227,27 @@ public class Utils {
      */
     private static <T> T getOrDef(T s, T def) {
         return s != null ? s : def;
+    }
+
+    /**
+     * 读取文件
+     *
+     * @param filePath 文件路径
+     * @return 内容
+     */
+    public static String readFile(InputStream is) {
+        try {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
+
+            StringBuilder content = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                content.append(line).append("\n");
+            }
+            return content.toString();
+        } catch (IOException e) {
+            return "";
+        }
     }
 
     /**
