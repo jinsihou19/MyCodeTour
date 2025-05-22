@@ -44,7 +44,7 @@ public class StepEditorPane extends JPanel {
         String rendered = TinyTemplateEngine.render(
                 "/public/editor/index.html",
                 Map.of("editor", jsQuery.inject("easyMDE.value()"),
-                        "markdown", escapeJavaScript(currentMarkdown)));
+                        "markdown", Utils.escapeJavaScript(currentMarkdown)));
         editorBrowser.loadHTML(rendered);
 
         // 移除滚动面板，直接添加编辑器组件
@@ -72,18 +72,6 @@ public class StepEditorPane extends JPanel {
 
         // 添加工具栏到底部
         add(toolbarPanel, BorderLayout.SOUTH);
-    }
-
-    private String escapeJavaScript(String str) {
-        return str.replace("\\", "\\\\")
-                .replace("'", "\\'")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
-    }
-
-    private boolean isIndex(String url) {
-        return url.startsWith("file:///jbcefbrowser/") && url.endsWith("url=about:blank");
     }
 
     private void saveChanges() {

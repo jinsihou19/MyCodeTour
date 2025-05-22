@@ -263,4 +263,18 @@ public class Utils {
     private static boolean isIndex(String url) {
         return url.startsWith("file:///jbcefbrowser/") && url.endsWith("url=about:blank");
     }
+
+    /**
+     * 编码到js中
+     *
+     * @param str 原始字符串
+     * @return 编码后
+     */
+    public static String escapeJavaScript(String str) {
+        return str.replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+    }
 }

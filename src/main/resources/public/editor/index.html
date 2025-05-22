@@ -18,14 +18,14 @@
     document.addEventListener('DOMContentLoaded', () => {
         const easyMDE = new EasyMDE({
             element: document.getElementById('editor'),
-            initialValue: "${markdown}",
+            initialValue: '${markdown}',
             autofocus: true,
             spellChecker: false,
             status: false,
             insertTexts: {
                 link: ["[", "](navigate://)"],
             },
-            toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', 'clean-block', 'table', 'code', '|', 'link', 'image', '|', 'undo', 'redo', 'fullscreen', 'preview'],
+            toolbar: ['bold', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', 'table', 'code', '|', 'link', 'image', '|', 'undo', 'redo'],
             previewRender:  (plainText) => {
                 var preview = document.createElement('div');
                 preview.className = 'markdown-body';

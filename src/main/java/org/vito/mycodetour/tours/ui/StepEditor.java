@@ -89,7 +89,7 @@ public class StepEditor extends DialogWrapper {
             String rendered = TinyTemplateEngine.render(
                     "/public/editor/index.html",
                     Map.of("editor", jsQuery.inject("easyMDE.value()"),
-                            "markdown", escapeJavaScript(currentMarkdown)));
+                            "markdown", Utils.escapeJavaScript(currentMarkdown)));
             editorBrowser.loadHTML(rendered);
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -124,14 +124,6 @@ public class StepEditor extends DialogWrapper {
         panel.add(textAreaPanel);
 
         return panel;
-    }
-
-    private String escapeJavaScript(String str) {
-        return str.replace("\\", "\\\\")
-                .replace("'", "\\'")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
     }
 
     private JComponent createPreviewPanel() {
