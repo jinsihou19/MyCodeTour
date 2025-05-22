@@ -19,7 +19,7 @@ public class TinyTemplateEngineTest extends TestCase {
                 "age", "30"
         );
 
-        String result = TinyTemplateEngine.render(template, data);
+        String result = TinyTemplateEngine.renderHtml(template, data);
         Assert.assertEquals("Hello, Alice! Your age is 30. Missing: ", result);
     }
 }

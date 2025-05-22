@@ -276,7 +276,9 @@ public class Tour {
             tour.setDescription(description);
             tour.setNextTour(nextTour);
             tour.setCreatedAt(createdAt);
-            tour.setSteps(steps);
+            if (steps != null) {
+                tour.setSteps(steps);
+            }
             tour.setVirtualFile(virtualFile);
             return tour;
         }

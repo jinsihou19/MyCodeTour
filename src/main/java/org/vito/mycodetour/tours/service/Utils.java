@@ -125,7 +125,9 @@ public class Utils {
         sb.append("\n\n").append(description).append("\n");
         sb.append(DocumentationMarkup.CONTENT_END);
         pageFooterIfNeed(file, sb);
-        return mdToHtml(sb.toString());
+        String markdownHtml = mdToHtml(sb.toString());
+        return TinyTemplateEngine.render("/public/index.html",
+                Map.of("markdownHtml", markdownHtml));
     }
 
     private static void pageFooterIfNeed(String file, StringBuilder sb) {
@@ -185,8 +187,7 @@ public class Utils {
             );
         }
 
-        return TinyTemplateEngine.render("/public/index.html",
-                Map.of("markdownHtml", html));
+        return html;
     }
 
     private static String createLink(String value) {
