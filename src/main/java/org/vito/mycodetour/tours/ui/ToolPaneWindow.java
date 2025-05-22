@@ -790,9 +790,6 @@ public class ToolPaneWindow {
 
         StateManager.getInstance().getState(project).createTour(project, newTour);
         project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(newTour);
-        CodeTourNotifier.notifyTourAction(project, newTour, "Creation",
-                String.format("Tour '%s' (file %s) has been created", newTour.getTitle(), newTour.getTourFile()));
-
     }
 
     private @Nullable Tour createNewTour() {
@@ -868,8 +865,6 @@ public class ToolPaneWindow {
                     // 刷新状态
                     StateManager.getInstance().getState(project).reloadState();
                     updateToursTree();
-                    CodeTourNotifier.notifyTourAction(project, null, "Folder Creation",
-                            String.format("Folder '%s' has been created", folderName));
                 } catch (IOException ex) {
                     CodeTourNotifier.error(project, "Failed to create folder: " + ex.getMessage());
                 }
@@ -959,6 +954,7 @@ public class ToolPaneWindow {
         StateManager.getInstance().getState(project).deleteTour(tour);
         CodeTourNotifier.notifyTourAction(project, tour, "Deletion", String.format("Tour " +
                 "'%s' (file %s) has been deleted", tour.getTitle(), tour.getTourFile()));
+        project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(tour);
     }
     //endregion
 
@@ -1090,7 +1086,5 @@ public class ToolPaneWindow {
 
         StateManager.getInstance().getState(project).createTour(project, newTour, folder.getVirtualFile());
         project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(newTour);
-        CodeTourNotifier.notifyTourAction(project, newTour, "Creation",
-                String.format("Tour '%s' (file %s) has been created", newTour.getTitle(), newTour.getTourFile()));
     }
 }
