@@ -11,9 +11,13 @@ import org.cef.misc.StringRef;
 import org.cef.network.CefRequest;
 import org.cef.network.CefResponse;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.Map;
 
 /**
  * 本地资源拦截处理
@@ -28,9 +32,15 @@ public class ResourceHandler implements CefResourceHandler {
     private InputStream inputStream;
     private String mimeType;
     private Project project;
+    private Map<String, String> values = Collections.emptyMap();
 
     public ResourceHandler(Project project) {
         this.project = project;
+    }
+
+    public ResourceHandler(Project project, Map<String, String> values) {
+        this.project = project;
+        this.values = values;
     }
 
     @Override
@@ -42,8 +52,11 @@ public class ResourceHandler implements CefResourceHandler {
         }
 
         // 解析URL路径（例如 "myapp:///html/index.html"）
-
-        if (url.startsWith("file:///mycodetour/")) {
+        if (url.startsWith("file:///mycodetour/") && url.endsWith("index.html")) {
+            String resourcePath = url.replace("file:///mycodetour", "");
+            String markdownHtml = TinyTemplateEngine.render(resourcePath, values);
+            inputStream = new ByteArrayInputStream(markdownHtml.getBytes(StandardCharsets.UTF_8));
+        } else if (url.startsWith("file:///mycodetour/")) {
             String resourcePath = url.replace("file:///mycodetour", "");
             inputStream = getClass().getResourceAsStream(resourcePath);
             if (inputStream == null) {

@@ -6,7 +6,6 @@ import com.intellij.ui.jcef.JBCefBrowser;
 import com.intellij.ui.jcef.JBCefBrowserBase;
 import com.intellij.ui.jcef.JBCefJSQuery;
 import org.vito.mycodetour.tours.domain.Step;
-import org.vito.mycodetour.tours.service.TinyTemplateEngine;
 import org.vito.mycodetour.tours.service.Utils;
 import org.vito.mycodetour.tours.state.StateManager;
 
@@ -32,8 +31,7 @@ public class StepEditorPane extends JPanel {
     }
 
     private void init() {
-        // 创建编辑器浏览器
-        JBCefBrowser editorBrowser = Utils.createNormalJBCefBrowser(project);
+        JBCefBrowser editorBrowser = new JBCefBrowser();
 
         // 创建 JavaScript 查询处理器
         JBCefJSQuery jsQuery = JBCefJSQuery.create((JBCefBrowserBase) editorBrowser);
@@ -42,11 +40,17 @@ public class StepEditorPane extends JPanel {
             return null;
         });
 
-        String rendered = TinyTemplateEngine.render(
-                "/public/editor/index.html",
-                Map.of("editor", jsQuery.inject("easyMDE.value()"),
-                        "markdown", Utils.escapeJavaScript(currentMarkdown)));
-        editorBrowser.loadHTML(rendered);
+        try {
+            Utils.addRequestHandler(
+                    editorBrowser,
+                    project,
+                    Map.of("editor", jsQuery.inject("easyMDE.value()"),
+                            "markdown", Utils.escapeJavaScript(currentMarkdown)));
+
+            editorBrowser.loadURL("file:///mycodetour/public/editor/index.html");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
         // 移除滚动面板，直接添加编辑器组件
         add(editorBrowser.getComponent(), BorderLayout.CENTER);

@@ -205,6 +205,15 @@ public class Tour {
         return multimap;
     }
 
+    /**
+     * 获取当前步骤总数
+     *
+     * @return 当前步骤总数
+     */
+    public int getStepCount() {
+        return this.steps.size();
+    }
+
 
     @Override
     public String toString() {

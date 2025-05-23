@@ -130,17 +130,6 @@ public class ToursState {
         return stepIdentifiersIndex.containsValue(identifier);
     }
 
-    public String getStepMetaLabel(String stepTitle) {
-        if (activeTour.isPresent()) {
-            Tour tour = activeTour.get();
-            return String.format("<strong>CodeTour</strong> <em>Step #%s of %s (%s)</em>",
-                    activeStepIndex + 1, tour.getSteps().size(), stepTitle);
-        } else {
-            return String.format("<strong>CodeTour</strong> <em>Step #%s (%s)</em>",
-                    activeStepIndex + 1, stepTitle);
-        }
-
-    }
 
     private List<Tour> loadTours(@NotNull List<TourFolder> tourFolders) {
         final List<Tour> tours = new ArrayList<>();

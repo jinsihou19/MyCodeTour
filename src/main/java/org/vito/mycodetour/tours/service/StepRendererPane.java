@@ -13,14 +13,12 @@ import org.cef.handler.CefResourceRequestHandlerAdapter;
 import org.cef.misc.BoolRef;
 import org.cef.network.CefRequest;
 import org.vito.mycodetour.tours.domain.Step;
-import org.vito.mycodetour.tours.state.StateManager;
 
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import java.awt.BorderLayout;
+import java.util.Map;
 import java.util.regex.Pattern;
-
-import static org.vito.mycodetour.tours.service.Utils.renderFullDoc;
 
 /**
  * Renders a Popup which includes the Step Documentation
@@ -57,19 +55,9 @@ public class StepRendererPane extends JPanel {
     }
 
     private JComponent markdownJCEFHtmlPanelForRender() {
-        final String stepDoc = renderFullDoc(
-                StateManager.getInstance().getState(project).getStepMetaLabel(step.getTitle()),
-                step.getDescription(),
-                step.reference());
-
-//        CefApp.getInstance().registerSchemeHandlerFactory(
-//                "file",
-//                "",
-//                (cefBrowser, cefFrame, s, cefRequest) -> new ResourceHandler());
 
         JBCefBrowser browser = new JBCefBrowser();
-
-        browser.loadHTML(stepDoc);
+        browser.loadURL("file:///mycodetour/public/index.html");
         browser.getJBCefClient().addRequestHandler(new CefRequestHandlerAdapter() {
             @Override
             public boolean onBeforeBrowse(CefBrowser browser, CefFrame frame, CefRequest request,
@@ -91,8 +79,8 @@ public class StepRendererPane extends JPanel {
                     @Override
                     public CefResourceHandler getResourceHandler(CefBrowser browser, CefFrame frame, CefRequest request) {
                         String url = request.getURL();
-                        if (url.startsWith("file:///") && !isIndex(url)) {
-                            return new ResourceHandler(project);
+                        if (url.startsWith("file:///")) {
+                            return new ResourceHandler(project, Map.of("markdownHtml", Utils.renderFullDoc(step)));
                         }
                         // 放行非必要处理请求
                         return null;
@@ -102,10 +90,6 @@ public class StepRendererPane extends JPanel {
         }, browser.getCefBrowser());
 
         return browser.getComponent();
-    }
-
-    private boolean isIndex(String url) {
-        return url.startsWith("file:///jbcefbrowser/") && url.endsWith("url=about:blank");
     }
 
     private boolean dealWithJCEFLink(String link) {

@@ -12,9 +12,7 @@ import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
 import org.jetbrains.annotations.NotNull;
 import org.vito.mycodetour.tours.domain.Step;
-import org.vito.mycodetour.tours.service.TinyTemplateEngine;
 import org.vito.mycodetour.tours.service.Utils;
-import org.vito.mycodetour.tours.state.StateManager;
 
 import javax.swing.Action;
 import javax.swing.BoxLayout;
@@ -26,7 +24,6 @@ import java.util.Map;
 
 import static org.vito.mycodetour.tours.service.Utils.equalInt;
 import static org.vito.mycodetour.tours.service.Utils.equalStr;
-import static org.vito.mycodetour.tours.service.Utils.renderFullDoc;
 
 /**
  * Editor (as dialog) for Step editing. Supports preview
@@ -43,7 +40,6 @@ public class StepEditor extends DialogWrapper {
     private JBTextField titleTextField;
     private JBTextField referenceTextField;
     private JBCefBrowser previewBrowser;
-    private String stepDoc;
     private String currentMarkdown;
 
     public StepEditor(Project project, Step step) {
@@ -75,7 +71,7 @@ public class StepEditor extends DialogWrapper {
 
     private JComponent createEditorPanel() {
         // 创建编辑器浏览器
-        JBCefBrowser editorBrowser = Utils.createNormalJBCefBrowser(project);
+        JBCefBrowser editorBrowser = new JBCefBrowser();
 
         // 创建 JavaScript 查询处理器
         JBCefJSQuery jsQuery = JBCefJSQuery.create((JBCefBrowserBase) editorBrowser);
@@ -86,11 +82,13 @@ public class StepEditor extends DialogWrapper {
         });
 
         try {
-            String rendered = TinyTemplateEngine.render(
-                    "/public/editor/index.html",
+            Utils.addRequestHandler(
+                    editorBrowser,
+                    project,
                     Map.of("editor", jsQuery.inject("easyMDE.value()"),
                             "markdown", Utils.escapeJavaScript(currentMarkdown)));
-            editorBrowser.loadHTML(rendered);
+
+            editorBrowser.loadURL("file:///mycodetour/public/editor/index.html");
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -127,15 +125,12 @@ public class StepEditor extends DialogWrapper {
     }
 
     private JComponent createPreviewPanel() {
-        stepDoc = renderFullDoc(
-                StateManager.getInstance().getState(project).getStepMetaLabel(titleTextField.getText()),
-                currentMarkdown,
-                referenceTextField.getText());
 
-        previewBrowser = Utils.createNormalJBCefBrowser(project);
-
-        updatePreviewContent();
-
+        // 创建编辑器浏览器
+        previewBrowser = new JBCefBrowser();
+        Utils.addRequestHandler(previewBrowser, project, Map.of("markdownHtml", Utils.renderFullDoc(step)));
+        previewBrowser.loadURL("file:///mycodetour/public/index.html");
+        
         final JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBorder(JBUI.Borders.emptyTop(5));
@@ -144,17 +139,14 @@ public class StepEditor extends DialogWrapper {
         return panel;
     }
 
-
     private void updatePreviewComponent() {
-        stepDoc = renderFullDoc(
-                StateManager.getInstance().getState(project).getStepMetaLabel(titleTextField.getText()),
-                currentMarkdown,
-                referenceTextField.getText());
-        updatePreviewContent();
-    }
-
-    private void updatePreviewContent() {
-        previewBrowser.loadHTML(stepDoc);
+        Utils.addRequestHandler(previewBrowser, project,
+                Map.of("markdownHtml", Utils.renderFullDoc(Step.builder()
+                        .title(titleTextField.getText())
+                        .description(currentMarkdown)
+                        .file(referenceTextField.getText())
+                        .build())));
+        previewBrowser.loadURL("file:///mycodetour/public/index.html");
     }
 
     public Step getUpdatedStep() {

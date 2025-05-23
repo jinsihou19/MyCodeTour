@@ -24,6 +24,7 @@ import org.intellij.markdown.html.HtmlGenerator;
 import org.intellij.markdown.parser.MarkdownParser;
 import org.jetbrains.annotations.NotNull;
 import org.vito.mycodetour.tours.domain.Props;
+import org.vito.mycodetour.tours.domain.Step;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -118,18 +119,28 @@ public class Utils {
         return getOrDef(i1, Integer.MIN_VALUE).equals(getOrDef(i2, Integer.MIN_VALUE));
     }
 
-    public static String renderFullDoc(String title, String description, String file) {
+    private static String getStepMetaLabel(Step step) {
+        if (step.getOwner() != null) {
+            return String.format("<strong>CodeTour</strong> <em>Step #%s of %s (%s)</em>",
+                    step.getStepIndex() + 1, step.getOwner().getStepCount(), step.getTitle());
+        } else {
+            return String.format("<strong>CodeTour</strong> <em>Step (%s)</em>", step.getTitle());
+        }
+    }
+
+    public static String renderFullDoc(Step step) {
         StringBuilder sb = new StringBuilder();
         sb.append(DocumentationMarkup.DEFINITION_START);
-        sb.append(title);
+        sb.append(getStepMetaLabel(step));
         sb.append(DocumentationMarkup.DEFINITION_END);
         sb.append(DocumentationMarkup.CONTENT_START);
-        if (description != null)
+        if (step.getDescription() != null) {
             // For formatting purposes, add <br/> tag when there are 2 consecutive empty lines
-            description = description.replaceAll("\\n\\n\\n", "\n\n<br/>\n\n");
-        sb.append("\n\n").append(description).append("\n");
+            String description = step.getDescription().replaceAll("\\n\\n\\n", "\n\n<br/>\n\n");
+            sb.append("\n\n").append(description).append("\n");
+        }
         sb.append(DocumentationMarkup.CONTENT_END);
-        pageFooterIfNeed(file, sb);
+        pageFooterIfNeed(step.reference(), sb);
         String markdownHtml = mdToHtml(sb.toString());
         return TinyTemplateEngine.render("/public/index.html",
                 Map.of("markdownHtml", markdownHtml));
@@ -272,12 +283,14 @@ public class Utils {
         return "";
     }
 
-    public static JBCefBrowser createNormalJBCefBrowser(Project project) {
-        JBCefBrowser previewBrowser = JBCefBrowser.createBuilder()
-                .setUrl("about:blank")
-                .build();
-
-        previewBrowser.getJBCefClient().addRequestHandler(new CefRequestHandlerAdapter() {
+    /**
+     * 添加请求处理器
+     * @param cefBrowser 浏览器实例
+     * @param project 工程
+     * @param initialValues 初始化页面参数
+     */
+    public static void addRequestHandler(JBCefBrowser cefBrowser, Project project, Map<String, String> initialValues) {
+        cefBrowser.getJBCefClient().addRequestHandler(new CefRequestHandlerAdapter() {
 
             @Override
             public boolean onOpenURLFromTab(CefBrowser browser, CefFrame frame, String target_url, boolean user_gesture) {
@@ -290,20 +303,15 @@ public class Utils {
                     @Override
                     public CefResourceHandler getResourceHandler(CefBrowser browser, CefFrame frame, CefRequest request) {
                         String url = request.getURL();
-                        if (url.startsWith("file:///") && !isIndex(url)) {
-                            return new ResourceHandler(project);
+                        if (url.startsWith("file:///")) {
+                            return new ResourceHandler(project, initialValues);
                         }
                         // 放行非必要处理请求
                         return null;
                     }
                 };
             }
-        }, previewBrowser.getCefBrowser());
-        return previewBrowser;
-    }
-
-    private static boolean isIndex(String url) {
-        return url.startsWith("file:///jbcefbrowser/") && url.endsWith("url=about:blank");
+        }, cefBrowser.getCefBrowser());
     }
 
     /**
