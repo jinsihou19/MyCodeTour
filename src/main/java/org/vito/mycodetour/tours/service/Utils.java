@@ -157,7 +157,7 @@ public class Utils {
                 }
                 try {
                     String s = readFile(resourceFile.getInputStream());
-                    return String.format("<div class='excalidraw' data-src='%s'></div>", s);
+                    return String.format("<div class='excalidraw' data-src='%s'></div>", escapeAttr(s));
                 } catch (IOException e) {
                     LOG.error(e);
                     return "<div class='excalidraw' data-src='$1.excalidraw'></div>";
@@ -318,5 +318,10 @@ public class Utils {
                 .replace("\n", "\\n")
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
+    }
+
+
+    private static String escapeAttr(String str) {
+        return str.replace("\\", "\\\\");
     }
 }
