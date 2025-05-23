@@ -9,6 +9,7 @@ body {
     display: flex;
     flex-direction: column;
     padding: 10px 0;
+    font-size: 14px;
 }
 
 .definition {
@@ -24,7 +25,7 @@ body {
 .content {
     flex-grow: 1;
     overflow-y: auto;
-    padding: 0 15px;
+    padding: 0 2em;
 }
 
 .footer pre {

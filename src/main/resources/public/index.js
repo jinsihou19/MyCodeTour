@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const container = document.createElement('div');
             container.style.width = '100%';
             container.style.height = '100%';
-            container.style.background = '#1e1e1e';
+            container.style.background = 'transparent';
             container.style.display = 'flex';
             container.style.alignItems = 'center';
             container.style.justifyContent = 'center';
@@ -48,13 +48,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 const {exportToSvg} = window.excalidrawLib;
                 const svg = await exportToSvg({
                     elements: excalidrawData.elements || [],
-                    appState:  {
-                        theme: "dark",
+                    appState: {
+                        ...excalidrawData.appState,
+                        exportWithDarkMode: true,
                     },
                     files: excalidrawData.files || {},
-                    exportPadding: 10,
-                    exportWithBackground: true,
-                    exportWithDarkMode: true,
+                    exportPadding: 10
                 });
                 // 设置SVG样式
                 svg.style.width = '100%';
