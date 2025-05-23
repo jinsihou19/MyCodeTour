@@ -82,9 +82,7 @@ public class StepEditor extends DialogWrapper {
         });
 
         try {
-            Utils.addRequestHandler(
-                    editorBrowser,
-                    project,
+            Utils.addRequestHandler(editorBrowser, project,
                     Map.of("editor", jsQuery.inject("easyMDE.value()"),
                             "markdown", Utils.escapeJavaScript(currentMarkdown)));
 
@@ -130,7 +128,7 @@ public class StepEditor extends DialogWrapper {
         previewBrowser = new JBCefBrowser();
         Utils.addRequestHandler(previewBrowser, project, Map.of("markdownHtml", Utils.renderFullDoc(step)));
         previewBrowser.loadURL("file:///mycodetour/public/index.html");
-        
+
         final JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBorder(JBUI.Borders.emptyTop(5));
