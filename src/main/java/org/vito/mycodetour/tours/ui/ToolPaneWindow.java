@@ -21,9 +21,12 @@ import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.ui.OnePixelSplitter;
+import com.intellij.ui.SearchTextField;
+import com.intellij.ui.components.JBPanel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.SlowOperations;
+import com.intellij.util.ui.JBUI;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -93,6 +96,10 @@ public class ToolPaneWindow {
     private final ToolWindow toolWindow;
     private final Project project;
 
+    private SearchTextField searchField;
+    private String currentSearchText = "";
+    private final Map<Object, String> highlightMap = new HashMap<>();
+
     public ToolPaneWindow(@NotNull Project project, @NotNull ToolWindow toolWindow) {
         this.toolWindow = toolWindow;
         this.project = project;
@@ -149,6 +156,46 @@ public class ToolPaneWindow {
 
     private void createToursTree() {
         final String activeId = StateManager.getInstance().getActiveTour(project).map(Tour::getId).orElse("Null");
+
+        // 创建搜索面板
+        JBPanel searchPanel = new JBPanel(new BorderLayout());
+        searchField = new SearchTextField(true) {
+            @Override
+            protected void onFieldCleared() {
+                clearSearchAndRestoreState();
+            }
+
+            @Override
+            protected boolean processKeyBinding(javax.swing.KeyStroke ks, java.awt.event.KeyEvent e, int condition, boolean pressed) {
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER && !pressed) {
+                    performSearch();
+                    return true;
+                } else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE && !pressed) {
+                    clearSearchAndRestoreState();
+                    return true;
+                }
+                return super.processKeyBinding(ks, e, condition, pressed);
+            }
+        };
+
+        searchField.addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                onSearchTextChanged();
+            }
+
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                onSearchTextChanged();
+            }
+
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                onSearchTextChanged();
+            }
+        });
+        searchPanel.add(searchField, BorderLayout.CENTER);
+        searchPanel.setBorder(JBUI.Borders.empty(5, 5, 0, 5));
 
         treeModel = new DefaultTreeModel(new DefaultMutableTreeNode(TREE_TITLE), false);
         toursTree = new Tree(treeModel);
@@ -388,6 +435,7 @@ public class ToolPaneWindow {
 
         final JPanel treePanel = new JPanel(new BorderLayout());
         treePanel.setName("treePanel");
+        treePanel.add(searchPanel, BorderLayout.NORTH);
         final JBScrollPane scrollPane = new JBScrollPane(toursTree);
         treePanel.add(scrollPane, BorderLayout.CENTER);
         for (int i = 0; i < splitter.getComponentCount(); i++) {
@@ -403,36 +451,43 @@ public class ToolPaneWindow {
      * 更新指南树数据
      */
     public void updateToursTree() {
-        // 保存当前展开的节点路径
+        // 保存当前展开的节点路径和选中状态
         Set<String> expandedNodePaths = new HashSet<>();
-        for (int i = 0; i < toursTree.getRowCount(); i++) {
-            TreePath path = toursTree.getPathForRow(i);
-            if (toursTree.isExpanded(path)) {
-                StringBuilder nodePath = new StringBuilder();
-                for (int j = 0; j < path.getPathCount(); j++) {
-                    Object component = path.getPathComponent(j);
-                    if (component instanceof DefaultMutableTreeNode) {
-                        Object userObject = ((DefaultMutableTreeNode) component).getUserObject();
-                        if (userObject instanceof Tour) {
-                            nodePath.append(((Tour) userObject).getVirtualFile().getPath());
-                        } else if (userObject instanceof TourFolder) {
-                            nodePath.append(((TourFolder) userObject).getVirtualFile().getPath());
-                        } else if (j == 0 && TREE_TITLE.equals(userObject)) {
-                            nodePath.append(TREE_TITLE);
-                        }
-                        if (j < path.getPathCount() - 1) {
-                            nodePath.append("/");
-                        }
+        TreePath selectedPath = toursTree.getSelectionPath();
+        String selectedPathString = null;
+        if (selectedPath != null) {
+            StringBuilder pathBuilder = new StringBuilder();
+            for (int j = 0; j < selectedPath.getPathCount(); j++) {
+                Object component = selectedPath.getPathComponent(j);
+                if (component instanceof DefaultMutableTreeNode) {
+                    Object userObject = ((DefaultMutableTreeNode) component).getUserObject();
+                    if (userObject instanceof Tour) {
+                        pathBuilder.append(((Tour) userObject).getVirtualFile().getPath());
+                    } else if (userObject instanceof TourFolder) {
+                        pathBuilder.append(((TourFolder) userObject).getVirtualFile().getPath());
+                    } else if (j == 0 && TREE_TITLE.equals(userObject)) {
+                        pathBuilder.append(TREE_TITLE);
+                    } else if (userObject instanceof Step) {
+                        pathBuilder.append(((Step) userObject).getStepIndex());
+                    }
+                    if (j < selectedPath.getPathCount() - 1) {
+                        pathBuilder.append("/");
                     }
                 }
-                if (!nodePath.isEmpty()) {
-                    expandedNodePaths.add(nodePath.toString());
-                }
             }
+            selectedPathString = pathBuilder.toString();
         }
 
         final ToursState state = StateManager.getInstance().getState(project);
         final DefaultMutableTreeNode root = new DefaultMutableTreeNode(TREE_TITLE);
+
+        // 获取搜索文本
+        String searchText;
+        if (toursTree.getCellRenderer() instanceof TreeRenderer renderer) {
+            searchText = renderer.getSearchText();
+        } else {
+            searchText = "";
+        }
 
         // 1. 获取所有文件夹
         List<TourFolder> allFolders = state.getFolders();
@@ -486,9 +541,19 @@ public class ToolPaneWindow {
         for (Tour tour : state.getTours()) {
             // 如果是demo tour，直接添加到根节点
             if (Validator.isDemo(tour)) {
-                DefaultMutableTreeNode tourNode = new DefaultMutableTreeNode(tour);
-                tour.getSteps().forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
-                root.insert(tourNode, 0);
+                if (StringUtils.isEmpty(searchText) || 
+                    (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(tour))) {
+                    DefaultMutableTreeNode tourNode = new DefaultMutableTreeNode(tour);
+                    // 只添加匹配的step
+                    tour.getSteps().stream()
+                        .filter(step -> StringUtils.isEmpty(searchText) || 
+                            (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(step)))
+                        .forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
+                    // 只有当tour有匹配的step时才添加到树中
+                    if (tourNode.getChildCount() > 0 || StringUtils.isEmpty(searchText)) {
+                        root.insert(tourNode, 0);
+                    }
+                }
                 continue;
             }
 
@@ -498,9 +563,19 @@ public class ToolPaneWindow {
                 if (parentDir != null) {
                     // 如果父目录是唯一的.tours文件夹，直接添加到根节点
                     if (hasSingleToursDir && parentDir.equals(singleToursDir.getVirtualFile())) {
-                        DefaultMutableTreeNode tourNode = new DefaultMutableTreeNode(tour);
-                        tour.getSteps().forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
-                        root.add(tourNode);
+                        if (StringUtils.isEmpty(searchText) || 
+                            (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(tour))) {
+                            DefaultMutableTreeNode tourNode = new DefaultMutableTreeNode(tour);
+                            // 只添加匹配的step
+                            tour.getSteps().stream()
+                                .filter(step -> StringUtils.isEmpty(searchText) || 
+                                    (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(step)))
+                                .forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
+                            // 只有当tour有匹配的step时才添加到树中
+                            if (tourNode.getChildCount() > 0 || StringUtils.isEmpty(searchText)) {
+                                root.add(tourNode);
+                            }
+                        }
                         continue;
                     }
 
@@ -521,22 +596,109 @@ public class ToolPaneWindow {
             DefaultMutableTreeNode folderNode = folderNodes.get(folder.getVirtualFile().getPath());
             if (folderNode != null) {
                 for (Tour tour : folderTours) {
-                    DefaultMutableTreeNode tourNode = new DefaultMutableTreeNode(tour);
-                    tour.getSteps().forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
-                    folderNode.add(tourNode);
+                    if (StringUtils.isEmpty(searchText) || 
+                        (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(tour))) {
+                        DefaultMutableTreeNode tourNode = new DefaultMutableTreeNode(tour);
+                        // 只添加匹配的step
+                        tour.getSteps().stream()
+                            .filter(step -> StringUtils.isEmpty(searchText) || 
+                                (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(step)))
+                            .forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
+                        // 只有当tour有匹配的step时才添加到树中
+                        if (tourNode.getChildCount() > 0 || StringUtils.isEmpty(searchText)) {
+                            folderNode.add(tourNode);
+                        }
+                    }
+                }
+                // 如果文件夹下没有节点，且正在搜索，则移除该文件夹
+                if (folderNode.getChildCount() == 0 && !StringUtils.isEmpty(searchText)) {
+                    DefaultMutableTreeNode parent = (DefaultMutableTreeNode) folderNode.getParent();
+                    if (parent != null) {
+                        parent.remove(folderNode);
+                    }
                 }
             }
+        }
+
+        // 清理空的文件夹节点
+        if (!StringUtils.isEmpty(searchText)) {
+            cleanupEmptyFolders(root);
         }
 
         toursTree.setRootVisible(toursDirs.size() <= 1);
         treeModel.setRoot(root);
         treeModel.reload();
 
-        // 恢复展开状态
-        restoreExpandedState(root, expandedNodePaths, "");
+        // 恢复展开状态和选中状态
+        if (StringUtils.isEmpty(searchText)) {
+            // 只有在非搜索状态下才恢复展开状态
+            restoreExpandedState(root, expandedNodePaths, "");
+            // 恢复选中状态
+            if (selectedPathString != null) {
+                restoreSelection(root, selectedPathString);
+            }
+        } else {
+            // 在搜索状态下展开所有节点
+            expandAllNodes();
+        }
+    }
+
+    private void cleanupEmptyFolders(DefaultMutableTreeNode node) {
+        // 从后向前遍历，这样删除节点时不会影响索引
+        for (int i = node.getChildCount() - 1; i >= 0; i--) {
+            DefaultMutableTreeNode child = (DefaultMutableTreeNode) node.getChildAt(i);
+            if (child.getUserObject() instanceof TourFolder) {
+                cleanupEmptyFolders(child);
+                // 如果文件夹下没有节点，则移除该文件夹
+                if (child.getChildCount() == 0) {
+                    node.remove(child);
+                }
+            }
+        }
+    }
+
+    private void restoreSelection(DefaultMutableTreeNode node, String targetPath) {
+        if (node == null) return;
+
+        Object userObject = node.getUserObject();
+        String nodePath;
+
+        if (userObject instanceof Tour tour) {
+            if (Validator.isDemo(tour)) {
+                nodePath = tour.getTitle();
+            } else {
+                nodePath = tour.getVirtualFile().getPath();
+            }
+        } else if (userObject instanceof TourFolder) {
+            nodePath = ((TourFolder) userObject).getVirtualFile().getPath();
+        } else if (userObject instanceof Step) {
+            nodePath = String.valueOf(((Step) userObject).getStepIndex());
+        } else if (TREE_TITLE.equals(userObject)) {
+            nodePath = TREE_TITLE;
+        } else {
+            return;
+        }
+
+        // 检查当前节点是否是目标路径的一部分
+        if (targetPath.startsWith(nodePath)) {
+            // 如果是完整匹配，选中该节点
+            if (targetPath.equals(nodePath)) {
+                TreePath path = new TreePath(node.getPath());
+                toursTree.setSelectionPath(path);
+                toursTree.scrollPathToVisible(path);
+                return;
+            }
+            // 否则继续搜索子节点
+            for (int i = 0; i < node.getChildCount(); i++) {
+                DefaultMutableTreeNode child = (DefaultMutableTreeNode) node.getChildAt(i);
+                restoreSelection(child, targetPath.substring(nodePath.length() + 1));
+            }
+        }
     }
 
     private void restoreExpandedState(DefaultMutableTreeNode node, Set<String> expandedPaths, String currentPath) {
+        if (node == null) return;
+
         Object userObject = node.getUserObject();
         String nodePath;
 
@@ -544,11 +706,13 @@ public class ToolPaneWindow {
             if (Validator.isDemo(tour)) {
                 nodePath = currentPath + tour.getTitle();
             } else {
-                nodePath = currentPath + ((Tour) userObject).getVirtualFile().getPath();
+                nodePath = currentPath + tour.getVirtualFile().getPath();
             }
 
         } else if (userObject instanceof TourFolder) {
             nodePath = currentPath + ((TourFolder) userObject).getVirtualFile().getPath();
+        } else if (userObject instanceof Step) {
+            nodePath = currentPath + ((Step) userObject).getStepIndex();
         } else if (TREE_TITLE.equals(userObject)) {
             nodePath = TREE_TITLE;
         } else {
@@ -1086,5 +1250,140 @@ public class ToolPaneWindow {
 
         StateManager.getInstance().getState(project).createTour(project, newTour, folder.getVirtualFile());
         project.getMessageBus().syncPublisher(TourUpdateNotifier.TOPIC).tourUpdated(newTour);
+    }
+
+    private void performSearch() {
+        String searchText = searchField.getText().trim();
+        if (StringUtils.isEmpty(searchText)) {
+            return;
+        }
+
+        // 展开所有节点
+        expandAllNodes();
+
+        // 查找并选中第一个匹配的节点
+        DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
+        DefaultMutableTreeNode firstMatch = findFirstMatch(root);
+        if (firstMatch != null) {
+            TreePath path = new TreePath(firstMatch.getPath());
+            toursTree.setSelectionPath(path);
+            toursTree.scrollPathToVisible(path);
+        }
+    }
+
+    private void expandAllNodes() {
+        for (int i = 0; i < toursTree.getRowCount(); i++) {
+            toursTree.expandRow(i);
+        }
+    }
+
+    private DefaultMutableTreeNode findFirstMatch(DefaultMutableTreeNode node) {
+        if (node == null) {
+            return null;
+        }
+
+        Object userObject = node.getUserObject();
+        if (userObject instanceof Tour || userObject instanceof Step) {
+            if (toursTree.getCellRenderer() instanceof TreeRenderer renderer) {
+                if (renderer.matchesSearch(userObject)) {
+                    return node;
+                }
+            }
+        }
+
+        // 递归搜索子节点
+        for (int i = 0; i < node.getChildCount(); i++) {
+            DefaultMutableTreeNode child = (DefaultMutableTreeNode) node.getChildAt(i);
+            DefaultMutableTreeNode match = findFirstMatch(child);
+            if (match != null) {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
+    private void onSearchTextChanged() {
+        String newSearchText = searchField.getText().trim();
+        if (!newSearchText.equals(currentSearchText)) {
+            currentSearchText = newSearchText;
+            if (toursTree.getCellRenderer() instanceof TreeRenderer renderer) {
+                renderer.setSearchText(newSearchText);
+            }
+            updateToursTree();
+        }
+    }
+
+    private void clearSearchAndRestoreState() {
+        // 保存当前展开状态
+        Set<String> expandedNodePaths = new HashSet<>();
+        for (int i = 0; i < toursTree.getRowCount(); i++) {
+            TreePath path = toursTree.getPathForRow(i);
+            if (toursTree.isExpanded(path)) {
+                StringBuilder nodePath = new StringBuilder();
+                for (int j = 0; j < path.getPathCount(); j++) {
+                    Object component = path.getPathComponent(j);
+                    if (component instanceof DefaultMutableTreeNode) {
+                        Object userObject = ((DefaultMutableTreeNode) component).getUserObject();
+                        if (userObject instanceof Tour) {
+                            nodePath.append(((Tour) userObject).getVirtualFile().getPath());
+                        } else if (userObject instanceof TourFolder) {
+                            nodePath.append(((TourFolder) userObject).getVirtualFile().getPath());
+                        } else if (j == 0 && TREE_TITLE.equals(userObject)) {
+                            nodePath.append(TREE_TITLE);
+                        } else if (userObject instanceof Step) {
+                            nodePath.append(((Step) userObject).getStepIndex());
+                        }
+                        if (j < path.getPathCount() - 1) {
+                            nodePath.append("/");
+                        }
+                    }
+                }
+                if (!nodePath.isEmpty()) {
+                    expandedNodePaths.add(nodePath.toString());
+                }
+            }
+        }
+
+        // 保存当前选中状态
+        TreePath selectedPath = toursTree.getSelectionPath();
+        String selectedPathString = null;
+        if (selectedPath != null) {
+            StringBuilder pathBuilder = new StringBuilder();
+            for (int j = 0; j < selectedPath.getPathCount(); j++) {
+                Object component = selectedPath.getPathComponent(j);
+                if (component instanceof DefaultMutableTreeNode) {
+                    Object userObject = ((DefaultMutableTreeNode) component).getUserObject();
+                    if (userObject instanceof Tour) {
+                        pathBuilder.append(((Tour) userObject).getVirtualFile().getPath());
+                    } else if (userObject instanceof TourFolder) {
+                        pathBuilder.append(((TourFolder) userObject).getVirtualFile().getPath());
+                    } else if (j == 0 && TREE_TITLE.equals(userObject)) {
+                        pathBuilder.append(TREE_TITLE);
+                    } else if (userObject instanceof Step) {
+                        pathBuilder.append(((Step) userObject).getStepIndex());
+                    }
+                    if (j < selectedPath.getPathCount() - 1) {
+                        pathBuilder.append("/");
+                    }
+                }
+            }
+            selectedPathString = pathBuilder.toString();
+        }
+
+        // 更新渲染器并刷新树
+        if (toursTree.getCellRenderer() instanceof TreeRenderer renderer) {
+            renderer.setSearchText("");
+        }
+        updateToursTree();
+
+        // 恢复展开状态
+        DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
+        restoreExpandedState(root, expandedNodePaths, "");
+
+        // 恢复选中状态
+        if (selectedPathString != null) {
+            restoreSelection(root, selectedPathString);
+        }
     }
 }

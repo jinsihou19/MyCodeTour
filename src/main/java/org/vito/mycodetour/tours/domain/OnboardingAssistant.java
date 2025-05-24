@@ -28,6 +28,7 @@ public class OnboardingAssistant {
                 .getResourceAsStream(DEMO_FILENAME)) {
             if (is == null) return;
             tour = new Gson().fromJson(new InputStreamReader(is, StandardCharsets.UTF_8), Tour.class);
+            tour.linkStep();
         } catch (Exception e) {
             LOG.error(e.getMessage(), e);
         }
