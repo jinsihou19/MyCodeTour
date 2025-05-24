@@ -5,7 +5,6 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -25,6 +24,7 @@ import org.vito.mycodetour.tours.state.TourUpdateNotifier;
 import org.vito.mycodetour.tours.ui.StepEditor;
 import org.vito.mycodetour.tours.ui.TourSelectionDialogWrapper;
 
+import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Objects.isNull;
@@ -65,17 +65,17 @@ public class TourStepGeneratorAction extends AnAction {
                 && element.getContext().equals(parent)) {
             step = Step.with(PsiHelper.getReference(parent));
         } else {
-            LogicalPosition logicalPosition = editor.getCaretModel().getLogicalPosition();
-            final int line = logicalPosition.line + 1;
-
             final VirtualFile virtualFile = e.getData(CommonDataKeys.VIRTUAL_FILE);
             if (virtualFile == null) {
                 return;
             }
-            String relativePath = getRelativePath(project, virtualFile);
-            step = Step.with(relativePath, line);
+            step = Step.with(getRelativePath(project, virtualFile), getLine(editor));
         }
-
+        // 如果有选中的代码段，则直接添加到描述中
+        String selectedText = editor.getSelectionModel().getSelectedText();
+        if (selectedText != null && !selectedText.trim().isEmpty()) {
+            step.setDescription("```\n" + selectedText + "\n```");
+        }
 
         // If no activeTour is present, prompt to select one
         if (StateManager.getInstance().getState(project).getActiveTour().isEmpty()) {
@@ -106,6 +106,35 @@ public class TourStepGeneratorAction extends AnAction {
 
     }
 
+    /**
+     * 选择记录文件的行数
+     * 规则：如果鼠标在选中文本范围内，使用选中文本的起始行；否则使用鼠标位置所在行
+     *
+     * @param editor 编辑器
+     * @return 记录文件的行数
+     */
+    private static int getLine(Editor editor) {
+        String selectedText = editor.getSelectionModel().getSelectedText();
+        if (Objects.isNull(selectedText) || selectedText.trim().isEmpty()) {
+            return editor.getCaretModel().getLogicalPosition().line + 1;
+        }
+
+        // 获取选中文本的起始行和鼠标位置
+        int caretOffset = editor.getCaretModel().getOffset();
+        int selectionStart = editor.getSelectionModel().getSelectionStart();
+        int selectionEnd = editor.getSelectionModel().getSelectionEnd();
+
+        // 判断鼠标位置是否在选中文本范围内
+        boolean isCaretInSelection = caretOffset >= selectionStart && caretOffset <= selectionEnd;
+        // 如果鼠标在选中文本范围内，使用选中文本的起始行；否则使用鼠标位置所在行
+        if (isCaretInSelection) {
+            return editor.getDocument().getLineNumber(selectionStart) + 1;
+        } else {
+            return editor.getCaretModel().getLogicalPosition().line + 1;
+        }
+        
+    }
+
     protected static String getRelativePath(Project project, VirtualFile virtualFile) {
         // 获取文件相对于源码根目录的路径
         return ReadAction.compute(() -> {
@@ -121,6 +150,5 @@ public class TourStepGeneratorAction extends AnAction {
             return virtualFile.getName();
         });
     }
-
 
 }
