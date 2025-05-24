@@ -45,16 +45,23 @@ import org.vito.mycodetour.tours.state.TourUpdateNotifier;
 import org.vito.mycodetour.tours.state.ToursState;
 import org.vito.mycodetour.tours.state.Validator;
 
+import javax.swing.AbstractAction;
+import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.KeyStroke;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 import java.awt.BorderLayout;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
@@ -159,25 +166,29 @@ public class ToolPaneWindow {
 
         // 创建搜索面板
         JBPanel searchPanel = new JBPanel(new BorderLayout());
-        searchField = new SearchTextField(true) {
+        searchField = new SearchTextField() {
             @Override
             protected void onFieldCleared() {
                 clearSearchAndRestoreState();
             }
 
             @Override
-            protected boolean processKeyBinding(javax.swing.KeyStroke ks, java.awt.event.KeyEvent e, int condition, boolean pressed) {
-                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER && !pressed) {
-                    performSearch();
-                    return true;
-                } else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE && !pressed) {
-                    clearSearchAndRestoreState();
+            public boolean processKeyBinding(KeyStroke ks, KeyEvent e, int condition, boolean pressed) {
+                if (pressed && ks.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    if (getText().isEmpty()) {
+                        // 如果搜索框为空，隐藏搜索框
+                        hideSearchField();
+                    } else {
+                        // 如果搜索框有内容，清空搜索框
+                        setText("");
+                    }
                     return true;
                 }
                 return super.processKeyBinding(ks, e, condition, pressed);
             }
         };
-
+        searchField.setVisible(false);  // 初始状态隐藏搜索框
+        searchField.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
         searchField.addDocumentListener(new javax.swing.event.DocumentListener() {
             @Override
             public void insertUpdate(javax.swing.event.DocumentEvent e) {
@@ -210,16 +221,7 @@ public class ToolPaneWindow {
                 if (selectedRow < 0 || pathSelected == null) {
                     // 在空白处点击时显示上下文菜单
                     if (e.getButton() == MouseEvent.BUTTON3) {
-                        final JBPopupMenu menu = new JBPopupMenu("Tree Context Menu");
-
-                        // Reload Action
-                        final JMenuItem reloadAction = new JMenuItem("Reload", AllIcons.Actions.Refresh);
-                        reloadAction.addActionListener(d -> {
-                            LOG.info("Re-creating the tree");
-                            reloadToursState();
-                        });
-
-                        menu.add(reloadAction);
+                        JBPopupMenu menu = getTreePanePopupMenu();
                         menu.show(toursTree, e.getX(), e.getY());
                     }
                     return;
@@ -246,6 +248,49 @@ public class ToolPaneWindow {
         });
 
 
+        registerDnD();
+
+
+        final JPanel treePanel = new JPanel(new BorderLayout());
+        treePanel.setName("treePanel");
+        treePanel.add(searchPanel, BorderLayout.NORTH);
+        final JBScrollPane scrollPane = new JBScrollPane(toursTree);
+        treePanel.add(scrollPane, BorderLayout.CENTER);
+        for (int i = 0; i < splitter.getComponentCount(); i++) {
+            if ("treePanel".equals(splitter.getComponent(i).getName())) {
+                splitter.remove(i);
+                break;
+            }
+        }
+        splitter.setFirstComponent(treePanel);
+
+        // 添加键盘监听器到整个窗口
+        content.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(
+                KeyStroke.getKeyStroke(KeyEvent.VK_F, Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()),
+                "showSearchField");
+        content.getActionMap().put("showSearchField", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                showSearchField();
+            }
+        });
+    }
+
+    private @NotNull JBPopupMenu getTreePanePopupMenu() {
+        final JBPopupMenu menu = new JBPopupMenu("Tree Context Menu");
+
+        // Reload Action
+        final JMenuItem reloadAction = new JMenuItem("Reload", AllIcons.Actions.Refresh);
+        reloadAction.addActionListener(d -> reloadToursState());
+        final JMenuItem searchAction = new JMenuItem("search", AllIcons.Actions.Search);
+        searchAction.addActionListener(d -> showSearchField());
+
+        menu.add(searchAction);
+        menu.add(reloadAction);
+        return menu;
+    }
+
+    private void registerDnD() {
         // 注册拖放源
         DnDManager dndManager = DnDManager.getInstance();
         dndManager.registerSource(new DnDSource() {
@@ -297,11 +342,10 @@ public class ToolPaneWindow {
             @Override
             public boolean update(DnDEvent event) {
                 Object attachedObject = event.getAttachedObject();
-                if (!(attachedObject instanceof DefaultMutableTreeNode)) {
+                if (!(attachedObject instanceof DefaultMutableTreeNode sourceNode)) {
                     return false;
                 }
 
-                DefaultMutableTreeNode sourceNode = (DefaultMutableTreeNode) attachedObject;
                 if (!(sourceNode.getUserObject() instanceof Step)) {
                     return false;
                 }
@@ -363,12 +407,11 @@ public class ToolPaneWindow {
                 }
 
                 Object attachedObject = event.getAttachedObject();
-                if (!(attachedObject instanceof DefaultMutableTreeNode)) {
+                if (!(attachedObject instanceof DefaultMutableTreeNode draggedNode)) {
                     return;
                 }
 
-                DefaultMutableTreeNode draggedNode = (DefaultMutableTreeNode) attachedObject;
-                if (!(draggedNode.getUserObject() instanceof Step)) {
+                if (!(draggedNode.getUserObject() instanceof Step draggedStep)) {
                     return;
                 }
 
@@ -378,16 +421,14 @@ public class ToolPaneWindow {
                 }
 
                 DefaultMutableTreeNode targetNode = (DefaultMutableTreeNode) targetPath.getLastPathComponent();
-                Step draggedStep = (Step) draggedNode.getUserObject();
 
                 // 获取源Tour
                 DefaultMutableTreeNode sourceParent = (DefaultMutableTreeNode) draggedNode.getParent();
                 Tour sourceTour = (Tour) sourceParent.getUserObject();
 
                 // 获取目标位置
-                if (targetNode.getUserObject() instanceof Tour) {
+                if (targetNode.getUserObject() instanceof Tour targetTour) {
                     // 如果目标是Tour，添加到Tour的最后
-                    Tour targetTour = (Tour) targetNode.getUserObject();
                     if (targetTour != sourceTour) {
                         // 如果是不同的Tour，需要移动Step
                         sourceTour.removeStep(draggedStep);
@@ -395,9 +436,8 @@ public class ToolPaneWindow {
                         StateManager.getInstance().getState(project).updateTour(sourceTour);
                         StateManager.getInstance().getState(project).updateTour(targetTour);
                     }
-                } else if (targetNode.getUserObject() instanceof Step) {
+                } else if (targetNode.getUserObject() instanceof Step targetStep) {
                     // 如果目标是Step，插入到该Step之前或之后
-                    Step targetStep = (Step) targetNode.getUserObject();
                     DefaultMutableTreeNode targetParent = (DefaultMutableTreeNode) targetNode.getParent();
                     Tour targetTour = (Tour) targetParent.getUserObject();
 
@@ -431,20 +471,19 @@ public class ToolPaneWindow {
                 }
             }
         }, toursTree);
+    }
 
-
-        final JPanel treePanel = new JPanel(new BorderLayout());
-        treePanel.setName("treePanel");
-        treePanel.add(searchPanel, BorderLayout.NORTH);
-        final JBScrollPane scrollPane = new JBScrollPane(toursTree);
-        treePanel.add(scrollPane, BorderLayout.CENTER);
-        for (int i = 0; i < splitter.getComponentCount(); i++) {
-            if ("treePanel".equals(splitter.getComponent(i).getName())) {
-                splitter.remove(i);
-                break;
-            }
+    private void showSearchField() {
+        if (!searchField.isVisible()) {
+            searchField.setVisible(true);
+            searchField.requestFocusInWindow();
+            searchField.selectText();
         }
-        splitter.setFirstComponent(treePanel);
+    }
+
+    private void hideSearchField() {
+        searchField.setVisible(false);
+        toursTree.requestFocusInWindow();
     }
 
     /**
@@ -541,14 +580,14 @@ public class ToolPaneWindow {
         for (Tour tour : state.getTours()) {
             // 如果是demo tour，直接添加到根节点
             if (Validator.isDemo(tour)) {
-                if (StringUtils.isEmpty(searchText) || 
-                    (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(tour))) {
+                if (StringUtils.isEmpty(searchText) ||
+                        (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(tour))) {
                     DefaultMutableTreeNode tourNode = new DefaultMutableTreeNode(tour);
                     // 只添加匹配的step
                     tour.getSteps().stream()
-                        .filter(step -> StringUtils.isEmpty(searchText) || 
-                            (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(step)))
-                        .forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
+                            .filter(step -> StringUtils.isEmpty(searchText) ||
+                                    (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(step)))
+                            .forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
                     // 只有当tour有匹配的step时才添加到树中
                     if (tourNode.getChildCount() > 0 || StringUtils.isEmpty(searchText)) {
                         root.insert(tourNode, 0);
@@ -563,14 +602,14 @@ public class ToolPaneWindow {
                 if (parentDir != null) {
                     // 如果父目录是唯一的.tours文件夹，直接添加到根节点
                     if (hasSingleToursDir && parentDir.equals(singleToursDir.getVirtualFile())) {
-                        if (StringUtils.isEmpty(searchText) || 
-                            (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(tour))) {
+                        if (StringUtils.isEmpty(searchText) ||
+                                (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(tour))) {
                             DefaultMutableTreeNode tourNode = new DefaultMutableTreeNode(tour);
                             // 只添加匹配的step
                             tour.getSteps().stream()
-                                .filter(step -> StringUtils.isEmpty(searchText) || 
-                                    (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(step)))
-                                .forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
+                                    .filter(step -> StringUtils.isEmpty(searchText) ||
+                                            (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(step)))
+                                    .forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
                             // 只有当tour有匹配的step时才添加到树中
                             if (tourNode.getChildCount() > 0 || StringUtils.isEmpty(searchText)) {
                                 root.add(tourNode);
@@ -596,14 +635,14 @@ public class ToolPaneWindow {
             DefaultMutableTreeNode folderNode = folderNodes.get(folder.getVirtualFile().getPath());
             if (folderNode != null) {
                 for (Tour tour : folderTours) {
-                    if (StringUtils.isEmpty(searchText) || 
-                        (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(tour))) {
+                    if (StringUtils.isEmpty(searchText) ||
+                            (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(tour))) {
                         DefaultMutableTreeNode tourNode = new DefaultMutableTreeNode(tour);
                         // 只添加匹配的step
                         tour.getSteps().stream()
-                            .filter(step -> StringUtils.isEmpty(searchText) || 
-                                (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(step)))
-                            .forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
+                                .filter(step -> StringUtils.isEmpty(searchText) ||
+                                        (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(step)))
+                                .forEach(step -> tourNode.add(new DefaultMutableTreeNode(step)));
                         // 只有当tour有匹配的step时才添加到树中
                         if (tourNode.getChildCount() > 0 || StringUtils.isEmpty(searchText)) {
                             folderNode.add(tourNode);
