@@ -1,6 +1,6 @@
 // 导入样式
-import './github-markdown-dark.min.css';
-import './github-dark.min.css';
+import 'highlight.js/styles/github-dark.css';
+import 'github-markdown-css/github-markdown-dark.css';
 import './index.css';
 
 // 导入首屏必需的依赖

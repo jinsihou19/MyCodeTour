@@ -4,7 +4,10 @@ const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
 module.exports = {
     mode: 'development',
-    entry: './index.js',
+    entry: {
+        main: './index.js',
+        editor: './editor/index.js'
+    },
     output: {
         path: path.resolve(__dirname, '../src/main/resources/public'),
         filename: '[name].[contenthash].js',
@@ -56,6 +59,25 @@ module.exports = {
             template: './index.html',
             filename: 'index.html',
             inject: 'head',
+            chunks: ['main'],
+            minify: {
+                removeComments: true,
+                collapseWhitespace: true,
+                removeRedundantAttributes: true,
+                useShortDoctype: true,
+                removeEmptyAttributes: true,
+                removeStyleLinkTypeAttributes: true,
+                keepClosingSlash: true,
+                minifyJS: true,
+                minifyCSS: true,
+                minifyURLs: true,
+            }
+        }),
+        new HtmlWebpackPlugin({
+            template: './editor/index.html',
+            filename: 'editor/index.html',
+            inject: 'head',
+            chunks: ['editor'],
             minify: {
                 removeComments: true,
                 collapseWhitespace: true,

@@ -29,6 +29,8 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
+    "easymde": "^2.18.0",
+    "github-markdown-css": "^5.8.1",
     "highlight.js": "^11.11.1",
     "mermaid": "^11.6.0",
     "plantuml-encoder": "^1.4.0"

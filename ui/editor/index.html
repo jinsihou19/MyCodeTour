@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='UTF-8'>
+    <title>editor</title>
+</head>
+<body>
+    <textarea id='editor'></textarea>
+    <script>
+        // 这些变量将由后端注入
+        window.initialMarkdown = '${markdown}';
+        window.onEditorChange = `${editor}`;
+    </script>
+</body>
+</html>
