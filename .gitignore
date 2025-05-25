@@ -3,3 +3,4 @@
 .gradle
 .qodana
 build
+node_modules
