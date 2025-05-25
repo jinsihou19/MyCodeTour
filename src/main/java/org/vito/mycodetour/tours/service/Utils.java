@@ -141,9 +141,7 @@ public class Utils {
         }
         sb.append(DocumentationMarkup.CONTENT_END);
         pageFooterIfNeed(step.reference(), sb);
-        String markdownHtml = mdToHtml(sb.toString());
-        return TinyTemplateEngine.render("/public/index.html",
-                Map.of("markdownHtml", markdownHtml));
+        return mdToHtml(sb.toString());
     }
 
     private static void pageFooterIfNeed(String file, StringBuilder sb) {

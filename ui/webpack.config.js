@@ -56,7 +56,7 @@ module.exports = {
             chunkFilename: 'css/[id].[contenthash].css',
         }),
         new HtmlWebpackPlugin({
-            template: './index.html',
+            template: path.resolve(__dirname, 'index.html'),
             filename: 'index.html',
             inject: 'head',
             chunks: ['main'],
@@ -74,7 +74,7 @@ module.exports = {
             }
         }),
         new HtmlWebpackPlugin({
-            template: './editor/index.html',
+            template: path.resolve(__dirname, 'editor/index.html'),
             filename: 'editor/index.html',
             inject: 'head',
             chunks: ['editor'],

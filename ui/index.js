@@ -14,7 +14,6 @@ hljs.registerLanguage('javascript', javascript);
 
 // 导出首屏必需的全局变量
 window.hljs = hljs;
-
 // 首屏渲染
 document.addEventListener('DOMContentLoaded', function () {
     // 代码高亮
@@ -29,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function () {
     loadMermaid();
     loadPlantUML();
     loadExcalidraw();
-});
+}, {once: true});
 
 // 异步加载 Mermaid
 async function loadMermaid() {
@@ -44,7 +43,6 @@ async function loadMermaid() {
             sequence: {useMaxWidth: true},
             gantt: {useMaxWidth: true}
         });
-        window.mermaid = mermaid.default;
     }
 }
 
@@ -53,8 +51,6 @@ async function loadPlantUML() {
     const plantumlElements = document.querySelectorAll('.plantuml');
     if (plantumlElements.length > 0) {
         const plantumlEncoder = await import('plantuml-encoder');
-        window.plantumlEncoder = plantumlEncoder.default;
-
         plantumlElements.forEach(function (element) {
             const encoded = plantumlEncoder.default.encode(element.textContent);
             const img = document.createElement('img');
@@ -71,12 +67,15 @@ async function loadExcalidraw() {
     const excalidrawElements = document.querySelectorAll('.excalidraw');
     if (excalidrawElements.length > 0) {
         const {exportToSvg} = await import('@excalidraw/excalidraw');
-        window.exportToSvg = exportToSvg;
 
         for (const element of excalidrawElements) {
             const excalidrawString = element.getAttribute('data-src');
+            if (excalidrawString === null || excalidrawString === undefined) {
+                continue;
+            }
             try {
                 const excalidrawData = JSON.parse(excalidrawString);
+                element.removeAttribute('data-src')
 
                 // 创建容器
                 const container = document.createElement('div');

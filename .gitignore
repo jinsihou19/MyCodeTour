@@ -4,3 +4,4 @@
 .qodana
 build
 node_modules
+src/main/resources/public
