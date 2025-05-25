@@ -16,6 +16,16 @@ A fork of CodeTour supercharged with intuitive workflows. Transform codebases in
 ▸ **Tour Dashboard**: Access via <kbd>View</kbd> > <kbd>Tool Windows</kbd> > <kbd>Tours Navigation</kbd>  
 ▸ **Precision Jump**: Auto-navigate to code lines with single click on tour steps
 
+▸ **Smart Search**: 
+  - Full-text search across all tour steps
+  - Filter by file, tag, or content type
+  - Fuzzy matching for quick navigation
+
+▸ **Rich Diagram Support**:
+  - **Mermaid**: Create flowcharts, sequence diagrams, and more
+  - **PlantUML**: Design UML diagrams and system architecture
+  - **Excalidraw**: Draw hand-drawn style diagrams and sketches
+
 ### Team Knowledge Hub
 ▸ **Version-Control Ready**: Store tours alongside code for collaborative maintenance
 
@@ -90,6 +100,7 @@ Search "MyCodeTour" > Click <kbd>Install</kbd>
 2. Pricing Strategy → [[PriceCalculator.applyDiscounts()]]
 3. Payment State Machine → [[PaymentStateMachine.handle()]]
 
+
 ## Resources
 - [Architecture Decision Record]()
 - [Domain Model Diagram]()
@@ -106,6 +117,45 @@ B -->|No| D[Log Security Alert]
 ```
 > 🔐 Transaction boundary management in [[PaymentService#processCallback]]
 ````
+
+
+## Architecture Overview
+
+````md
+```mermaid
+graph TD
+    A[Client] --> B[API Gateway]
+    B --> C[Order Service]
+    C --> D[Payment Service]
+    D --> E[External Gateway]
+```
+````
+
+![img.png](assets/mermaid.png)
+
+## System Components
+
+```md
+@startuml
+package "Order Domain" {
+    [Order] as o
+    [Payment] as p
+    [Inventory] as i
+}
+o --> p
+o --> i
+@enduml
+```
+![img.png](assets/plantuml.png)
+
+
+## Record WhiteBoard
+
+```md
+![[whiteboard.excalidraw]]
+```
+
+![whiteboard.excalidraw](assets/excalidraw.png)
 
 ---
 
