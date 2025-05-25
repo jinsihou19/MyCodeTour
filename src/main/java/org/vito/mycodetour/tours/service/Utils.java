@@ -168,7 +168,9 @@ public class Utils {
                 }
                 try {
                     String s = readFile(resourceFile.getInputStream());
-                    return String.format("<div class='excalidraw' data-src='%s'></div>", escapeAttr(s));
+                    return String.format("<div class='excalidraw' data-src='%s' data-source-file='%s'></div>", 
+                        escapeAttr(s), 
+                        escapeAttr(resourceFile.getPath()));
                 } catch (IOException e) {
                     LOG.error(e);
                     return "<div class='excalidraw' data-src='$1.excalidraw'></div>";

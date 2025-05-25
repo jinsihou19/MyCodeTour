@@ -26,7 +26,6 @@ document.addEventListener('DOMContentLoaded', function () {
     excalidrawElements.forEach(async function (element) {
         const excalidrawString = element.getAttribute('data-src');
         try {
-            // const response = await fetch(`file:///${src}`);
             const excalidrawData = JSON.parse(excalidrawString)
 
             // 创建容器
@@ -38,7 +37,15 @@ document.addEventListener('DOMContentLoaded', function () {
             container.style.alignItems = 'center';
             container.style.justifyContent = 'center';
             element.appendChild(container);
-            debugger
+
+            // 获取源文件路径
+            const sourceFile = element.getAttribute('data-source-file');
+            if (sourceFile) {
+                container.style.cursor = 'pointer';
+                container.onclick = () => {
+                    window.location.href = `navigate://${sourceFile}`;
+                };
+            }
 
             // 直接显示SVG内容
             if (excalidrawData.svg) {

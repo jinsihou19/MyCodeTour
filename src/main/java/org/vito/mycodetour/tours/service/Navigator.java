@@ -9,6 +9,7 @@ import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.ui.popup.PopupStep;
 import com.intellij.openapi.ui.popup.util.BaseListPopupStep;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.pom.Navigatable;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiClass;
@@ -25,6 +26,7 @@ import org.vito.mycodetour.tours.state.StateManager;
 import org.vito.mycodetour.tours.state.StepSelectionNotifier;
 import org.vito.mycodetour.tours.ui.CodeTourNotifier;
 
+import java.io.File;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -47,6 +49,7 @@ public class Navigator {
     public static final String NAVIGATE = "navigate://";
     public static final String TOUR = "tour://";
     private static final String FILE_JBCEFBROWSER = "file:///jbcefbrowser/";
+    private static final String FILE_EXCALIDRAW_SUFFIX = ".excalidraw";
 
     /**
      * 导航到指定行
@@ -124,20 +127,39 @@ public class Navigator {
      * @param project     工程
      */
     public static void navigateCode(@NotNull String navigateUrl, @NotNull Project project) {
-
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            String url = navigateUrl;
+            String url;
             if (navigateUrl.startsWith(NAVIGATE)) {
                 url = navigateUrl.substring(NAVIGATE.length());
             } else if (navigateUrl.startsWith(FILE_JBCEFBROWSER)) {
                 url = navigateUrl.substring(FILE_JBCEFBROWSER.length());
+            } else {
+                url = navigateUrl;
             }
-            if (url.contains(":")) {
+
+            if (url.endsWith(FILE_EXCALIDRAW_SUFFIX)) {
+                navigateExcalidraw(project, url);
+            } else if (url.contains(":")) {
                 navigateLine(url, project);
             } else {
                 navigateJavaPsi(url, project);
             }
         });
+    }
+
+    /**
+     * 简单处理excalidraw文件的链接
+     *
+     * @param project 工程
+     * @param url
+     */
+    private static void navigateExcalidraw(@NotNull Project project, String url) {
+        VirtualFile targetFile = ReadAction.compute(() ->
+                VirtualFileManager.getInstance().findFileByNioPath(new File(url).toPath()));
+        if (targetFile != null) {
+            ApplicationManager.getApplication().invokeLater(() ->
+                    new OpenFileDescriptor(project, targetFile, 0).navigate(true));
+        }
     }
 
     /**
