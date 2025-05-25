@@ -323,6 +323,7 @@ public class Utils {
     public static String escapeJavaScript(String str) {
         return str.replace("\\", "\\\\")
                 .replace("'", "\\'")
+                .replace("\"", "\\\"")
                 .replace("\n", "\\n")
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
