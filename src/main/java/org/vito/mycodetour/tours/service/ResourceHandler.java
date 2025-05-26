@@ -12,7 +12,6 @@ import org.cef.network.CefRequest;
 import org.cef.network.CefResponse;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -63,8 +62,11 @@ public class ResourceHandler implements CefResourceHandler {
                 return false;
             }
         } else {
-            String resourcePath = url.replace("file:///", "");
-            VirtualFile resourceFile = VirtualFileManager.getInstance().findFileByNioPath(new File(project.getBasePath() + "/" + resourcePath).toPath());
+            String resourcePath = url;
+            if (!resourcePath.startsWith("file:///")) {
+                resourcePath = "file://" + project.getBasePath() + "/" + resourcePath.replace("file://", "");
+            }
+            VirtualFile resourceFile = VirtualFileManager.getInstance().findFileByUrl(resourcePath);
             if (resourceFile == null) {
                 return false;
             }

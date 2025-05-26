@@ -48,6 +48,7 @@ public class Utils {
 
     public static final Pattern WIKI_LINK = Pattern.compile("\\[\\[([^]]+)]]");
     public static final Pattern EXCALIDRAW_LINK = Pattern.compile("!\\[\\[([^]]+)\\.excalidraw]]");
+    public static final Pattern IMAGE_LINK = Pattern.compile("!\\[\\[([^]]+)]]");
 
     /**
      * Custom TagRenderer for md to html, as for some strange reason there is no default implementation now
@@ -184,6 +185,7 @@ public class Utils {
         String processedMarkdown = markdown;
         // 预处理 ![[]] 语法
         if (processedMarkdown.contains("![[")) {
+            // 处理excalidraw文件引用
             processedMarkdown = EXCALIDRAW_LINK.matcher(processedMarkdown).replaceAll(matchResult -> {
                 String group = matchResult.group(1);
                 VirtualFile resourceFile = VirtualFileManager.getInstance().findFileByNioPath(
@@ -201,11 +203,18 @@ public class Utils {
                     return "<div class='excalidraw' data-src='$1.excalidraw'></div>";
                 }
             });
-            // 仿照上面处理
-            processedMarkdown = processedMarkdown.replaceAll(
-                    "!\\[\\[([^]]+)]]",
-                    "<img src=\"file:///$1\" alt=\"$1\">"
-            );
+            // fallback 到图片处理
+            processedMarkdown = IMAGE_LINK.matcher(processedMarkdown).replaceAll(matchResult -> {
+                String group = matchResult.group(1);
+                VirtualFile resourceFile = VirtualFileManager.getInstance().findFileByNioPath(
+                        new File(baseDir + "/" + group).toPath());
+                if (resourceFile == null) {
+                    return "<img src='file:///$1' alt='$1'>";
+                }
+                return String.format("<img src='file://%s' alt='%s' data-origin-src='%s'/>",
+                        escapeAttr(resourceFile.getPath()),
+                        group, group);
+            });
         }
         // 预处理 [[xx]] 语法
         if (processedMarkdown.contains("[[")) {

@@ -123,11 +123,11 @@ B -->|No| D[Log Security Alert]
 
 ````md
 ```mermaid
-graph TD
-    A[Client] --> B[API Gateway]
-    B --> C[Order Service]
-    C --> D[Payment Service]
-    D --> E[External Gateway]
+graph TD;
+    A-->B;
+    A-->C;
+    B-->D;
+    C-->D;
 ```
 ````
 

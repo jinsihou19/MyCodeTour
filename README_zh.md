@@ -99,11 +99,11 @@ B -->|否| D[记录异常日志]
 
 ## 系统架构概览
 ```mermaid
-graph TD
-    A[客户端] --> B[API网关]
-    B --> C[订单服务]
-    C --> D[支付服务]
-    D --> E[外部网关]
+graph TD;
+    A-->B;
+    A-->C;
+    B-->D;
+    C-->D;
 ```
 ![系统架构图](assets/mermaid.png)
 
