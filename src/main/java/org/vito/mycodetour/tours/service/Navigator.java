@@ -351,7 +351,7 @@ public class Navigator {
 
         // 查找 step
         Optional<Step> step = tour.get().getSteps().stream()
-                .filter(s -> s.getTitle().equals(stepTitle))
+                .filter(s -> s.getTitle().equals(URLDecoder.decode(stepTitle, StandardCharsets.UTF_8)))
                 .findFirst();
 
         if (step.isEmpty()) {

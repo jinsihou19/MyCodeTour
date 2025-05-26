@@ -16,17 +16,23 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.openapi.ui.MessageDialogBuilder;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.ui.popup.Balloon;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.wm.StatusBar;
 import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.openapi.wm.WindowManager;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.ui.OnePixelSplitter;
 import com.intellij.ui.SearchTextField;
+import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBPanel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.SlowOperations;
 import com.intellij.util.ui.JBUI;
+import icons.Icons;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -927,6 +933,17 @@ public class ToolPaneWindow {
             final JMenuItem editDescriptionAction = new JMenuItem("Edit Step", AllIcons.Actions.EditScheme);
             editDescriptionAction.addActionListener(d -> editStepListener(step, tour));
 
+            // Copy Reference Action
+            final JMenuItem copyReferenceAction = new JMenuItem("Copy Reference", AllIcons.Actions.Copy);
+            copyReferenceAction.addActionListener(d -> {
+                String reference = tour.getTourFile() + "#" + step.getTitle();
+                Toolkit.getDefaultToolkit().getSystemClipboard().setContents(
+                        new java.awt.datatransfer.StringSelection(reference), null);
+
+                showTip(e, project, reference);
+
+            });
+
             // Move up Step
             final JMenuItem moveUpAction = new JMenuItem("Move Up", AllIcons.Actions.MoveUp);
             moveUpAction.addActionListener(d -> moveListener(step, tour, true));
@@ -942,11 +959,11 @@ public class ToolPaneWindow {
             deleteAction.addActionListener(d -> deleteStepListener(step, tour));
 
             if (Validator.isDemo(tour)) {
-                Arrays.asList(editDescriptionAction, moveUpAction, moveDownAction, deleteAction)
+                Arrays.asList(editDescriptionAction, moveUpAction, moveDownAction, deleteAction, copyReferenceAction)
                         .forEach(item -> item.setEnabled(false));
             }
 
-            Arrays.asList(editDescriptionAction, moveUpAction, moveDownAction, deleteAction)
+            Arrays.asList(editDescriptionAction, copyReferenceAction, moveUpAction, moveDownAction, deleteAction)
                     .forEach(menu::add);
             menu.show(toursTree, e.getX(), e.getY());
             return;
@@ -957,6 +974,19 @@ public class ToolPaneWindow {
             StateManager.getInstance().getState(project).setActiveStepIndex(index);
         createOrUpdateContent(step, project);
         Navigator.navigateLine(step, project);
+    }
+
+    private static void showTip(MouseEvent e, Project project, String reference) {
+        // 在鼠标位置显示气球通知
+        JBPopupFactory.getInstance()
+                .createHtmlTextBalloonBuilder("Reference to this Step has been copied.", Icons.TOUR_16, null, null)
+                .setFadeoutTime(2000)
+                .createBalloon()
+                .show(RelativePoint.fromScreen(e.getLocationOnScreen()), Balloon.Position.above);
+        StatusBar statusBar = WindowManager.getInstance().getStatusBar(project);
+        if (statusBar != null) {
+            statusBar.setInfo("Reference to '" + reference + "' has been copied.");
+        }
     }
 
     private void folderClickListener(MouseEvent e, DefaultMutableTreeNode node) {
@@ -1222,7 +1252,7 @@ public class ToolPaneWindow {
     }
 
     private void selectTourStep(Step step) {
-        selectTourStep(step, false);
+        ApplicationManager.getApplication().invokeLater(() -> selectTourStep(step, false));
     }
 
     private void selectTourStep(Step step, boolean navigate) {
