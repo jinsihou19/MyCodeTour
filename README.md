@@ -11,6 +11,7 @@ A fork of CodeTour supercharged with intuitive workflows. Transform codebases in
 ▸ **Gutter Markers**: Right-click editor gutter > **Add Tour Step** (as simple as setting breakpoints)  
 ▸ **Rich Content Support**: Markdown/HTML formatting with embedded diagrams and code snippets  
 ▸ **Customizable Popups**: Adjustable note windows (position/size/fonts) for optimal readability
+▸ **Wiki-Style Step Linking**: Copy step references from context menu for easy cross-referencing
 
 ### Visual Navigation System
 ▸ **Tour Dashboard**: Access via <kbd>View</kbd> > <kbd>Tool Windows</kbd> > <kbd>Tours Navigation</kbd>  
@@ -24,7 +25,7 @@ A fork of CodeTour supercharged with intuitive workflows. Transform codebases in
 ▸ **Rich Diagram Support**:
   - **Mermaid**: Create flowcharts, sequence diagrams, and more
   - **PlantUML**: Design UML diagrams and system architecture
-  - **Excalidraw**: Draw hand-drawn style diagrams and sketches
+  - **Excalidraw**: Draw hand-drawn style diagrams and sketches (with intuitive relative path resolution)
 
 ### Team Knowledge Hub
 ▸ **Version-Control Ready**: Store tours alongside code for collaborative maintenance

@@ -1,33 +1,40 @@
 <!-- Keep a Changelog guide -> https://keepachangelog.com -->
 
-# MyCodeTour Changelog
+# MyCodeTour 更新日志
 
-## 0.2.0
+## 未发布
 
-### Features
+## 0.2.2
 
-- 绘图方面，支持 `![[demo.excalidraw]]` 链接 excalidraw 内嵌预览，以后可以使用excalidraw扩展你的想法
-- 支持选中一段代码生成Step
-- 支持Step搜索，右键或者快捷键 Ctrl/Command+F 进入搜索
-- 支持渲染界面点击进入编辑，方便记录
+### 新增
+- 新增 wiki 风格的 step 链接功能，支持通过右键菜单复制 step 引用
 
-### Refactoring
+### 变更
+- 修改资源加载的相对路径计算方式，现在从 .tours 文件的父目录开始计算，影响图片和 excalidraw 文件，使路径解析更符合直觉
 
+## 0.2.1
+
+### 新增
+- 添加对 Excalidraw 嵌入式预览的支持，通过 `![[demo.excalidraw]]` 链接实现可视化想法扩展
+- 添加从选中的代码块生成 Steps 的功能
+- 实现 Step 搜索功能，支持右键或 Ctrl/Command+F 快捷键
+- 添加渲染界面中的点击编辑功能，使文档编写更便捷
+- 添加"新功能"提示
+
+### 变更
 - 本地化前端资源
 
 ## 0.1.8
 
-### Features
-
-- 支持多文件夹层级
-- 支持 Java 变量、方法、类的导航方式，添加时按需生成
-- 代码正文支持PSI元素的行标记
+### 新增
+- 添加对多文件夹层次结构的支持
+- 实现 Java 变量、方法和类的导航功能，支持按需生成
+- 添加 PSI 元素在代码体中的行标记
 
 ## 0.1.5
 
-### Features
-
-- 新的 JCEF 渲染界面
-- 支持拖动改变 step
-- 支持 wiki 链接 `[[com.Main#main]]` 导航到代码
-- 支持图片加载
+### 新增
+- 新增 JCEF 渲染界面
+- 添加拖放支持，用于重新排序 step
+- 实现 wiki 风格的链接 `[[com.Main#main]]` 用于代码导航
+- 添加图片加载支持
