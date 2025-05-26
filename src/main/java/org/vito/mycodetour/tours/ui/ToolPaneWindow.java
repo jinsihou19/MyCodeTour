@@ -1092,6 +1092,7 @@ public class ToolPaneWindow {
             final Step step = Step.builder()
                     .title("A Description-Only Step")
                     .description("# Simple Description\nI won't navigate you anywhere")
+                    .tour(tour)
                     .build();
 
             // Provide a dialog for Step editing

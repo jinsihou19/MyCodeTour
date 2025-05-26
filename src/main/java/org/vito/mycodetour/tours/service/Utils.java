@@ -25,6 +25,7 @@ import org.intellij.markdown.parser.MarkdownParser;
 import org.jetbrains.annotations.NotNull;
 import org.vito.mycodetour.tours.domain.Props;
 import org.vito.mycodetour.tours.domain.Step;
+import org.vito.mycodetour.tours.domain.Tour;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -141,7 +142,14 @@ public class Utils {
         }
         sb.append(DocumentationMarkup.CONTENT_END);
         pageFooterIfNeed(step.reference(), sb);
-        return mdToHtml(sb.toString());
+        Tour owner = step.getOwner();
+        if (owner == null) {
+            return mdToHtml(sb.toString());
+        }
+        VirtualFile moduleRootDirectory = owner.getModuleRootDirectory();
+        return moduleRootDirectory != null
+                ? mdToHtml(sb.toString(), moduleRootDirectory.getPath())
+                : mdToHtml(sb.toString());
     }
 
     private static void pageFooterIfNeed(String file, StringBuilder sb) {
@@ -153,27 +161,47 @@ public class Utils {
         }
     }
 
+    /**
+     * 支持指定baseDir的mdToHtml
+     *
+     * @param markdown markdown内容
+     * @return html内容
+     */
     public static String mdToHtml(String markdown) {
+        Project[] openProjects = ProjectManager.getInstance().getOpenProjects();
+        String baseDir = openProjects.length > 0 ? openProjects[0].getBasePath() : "";
+        return mdToHtml(markdown, baseDir);
+    }
+
+    /**
+     * 支持指定baseDir的mdToHtml
+     *
+     * @param markdown markdown内容
+     * @param baseDir  资源查找的起始目录
+     * @return html内容
+     */
+    public static String mdToHtml(String markdown, String baseDir) {
         String processedMarkdown = markdown;
         // 预处理 ![[]] 语法
         if (processedMarkdown.contains("![[")) {
             processedMarkdown = EXCALIDRAW_LINK.matcher(processedMarkdown).replaceAll(matchResult -> {
                 String group = matchResult.group(1);
-                Project[] openProjects = ProjectManager.getInstance().getOpenProjects();
-                VirtualFile resourceFile = VirtualFileManager.getInstance().findFileByNioPath(new File(openProjects[0].getBasePath() + "/" + group + ".excalidraw").toPath());
+                VirtualFile resourceFile = VirtualFileManager.getInstance().findFileByNioPath(
+                        new File(baseDir + "/" + group + ".excalidraw").toPath());
                 if (resourceFile == null) {
                     return "<div class='excalidraw' data-src='$1.excalidraw'></div>";
                 }
                 try {
                     String s = readFile(resourceFile.getInputStream());
-                    return String.format("<div class='excalidraw' data-src='%s' data-source-file='%s'></div>", 
-                        escapeAttr(s), 
-                        escapeAttr(resourceFile.getPath()));
+                    return String.format("<div class='excalidraw' data-src='%s' data-source-file='%s'></div>",
+                            escapeAttr(s),
+                            escapeAttr(resourceFile.getPath()));
                 } catch (IOException e) {
                     LOG.error(e);
                     return "<div class='excalidraw' data-src='$1.excalidraw'></div>";
                 }
             });
+            // 仿照上面处理
             processedMarkdown = processedMarkdown.replaceAll(
                     "!\\[\\[([^]]+)]]",
                     "<img src=\"file:///$1\" alt=\"$1\">"
@@ -243,7 +271,7 @@ public class Utils {
     /**
      * 读取文件
      *
-     * @param filePath 文件路径
+     * @param is 文件流
      * @return 内容
      */
     public static String readFile(InputStream is) {
@@ -285,8 +313,9 @@ public class Utils {
 
     /**
      * 添加请求处理器
-     * @param cefBrowser 浏览器实例
-     * @param project 工程
+     *
+     * @param cefBrowser    浏览器实例
+     * @param project       工程
      * @param initialValues 初始化页面参数
      */
     public static void addRequestHandler(JBCefBrowser cefBrowser, Project project, Map<String, String> initialValues) {

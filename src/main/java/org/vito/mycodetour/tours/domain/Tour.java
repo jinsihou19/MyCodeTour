@@ -215,6 +215,27 @@ public class Tour {
     }
 
 
+    /**
+     * 获取.tours的父目录（即项目根目录）
+     *
+     * @return .tours的父目录VirtualFile，如果没有则返回null
+     */
+    @Nullable
+    public VirtualFile getModuleRootDirectory() {
+        if (virtualFile == null) {
+            return null;
+        }
+        VirtualFile parent = virtualFile.getParent();
+        while (parent != null && !Props.TOURS_DIR.equals(parent.getName())) {
+            parent = parent.getParent();
+        }
+        // parent 现在是 .tours 文件夹
+        if (parent != null) {
+            return parent.getParent();
+        }
+        return null;
+    }
+
     @Override
     public String toString() {
         return title;
