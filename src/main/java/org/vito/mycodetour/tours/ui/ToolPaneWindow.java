@@ -49,7 +49,6 @@ import org.vito.mycodetour.tours.state.StateManager;
 import org.vito.mycodetour.tours.state.StepSelectionNotifier;
 import org.vito.mycodetour.tours.state.TourUpdateNotifier;
 import org.vito.mycodetour.tours.state.ToursState;
-import org.vito.mycodetour.tours.state.Validator;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
@@ -84,6 +83,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import static org.vito.mycodetour.tours.state.Validator.isDemo;
 
 /**
  * Code Tour - Tool Window (Tours Navigation and Management).
@@ -365,7 +366,7 @@ public class ToolPaneWindow {
 
                 // 只允许拖放到Tour节点或Step节点上，但不允许拖放到Demo
                 if (targetNode.getUserObject() instanceof Tour targetTour) {
-                    if (Validator.isDemo(targetTour)) {
+                    if (isDemo(targetTour)) {
                         event.setDropPossible(false, "Cannot drop into Demo");
                         return false;
                     }
@@ -380,7 +381,7 @@ public class ToolPaneWindow {
                     // 检查父节点是否是Demo
                     DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) targetNode.getParent();
                     if (parentNode.getUserObject() instanceof Tour parentTour) {
-                        if (Validator.isDemo(parentTour)) {
+                        if (isDemo(parentTour)) {
                             event.setDropPossible(false, "Cannot drop into Demo");
                             return false;
                         }
@@ -506,8 +507,10 @@ public class ToolPaneWindow {
                 Object component = selectedPath.getPathComponent(j);
                 if (component instanceof DefaultMutableTreeNode) {
                     Object userObject = ((DefaultMutableTreeNode) component).getUserObject();
-                    if (userObject instanceof Tour) {
-                        pathBuilder.append(((Tour) userObject).getVirtualFile().getPath());
+                    if (userObject instanceof Tour tour) {
+                        if (!isDemo(tour)) {
+                            pathBuilder.append(tour.getVirtualFile().getPath());
+                        }
                     } else if (userObject instanceof TourFolder) {
                         pathBuilder.append(((TourFolder) userObject).getVirtualFile().getPath());
                     } else if (j == 0 && TREE_TITLE.equals(userObject)) {
@@ -585,7 +588,7 @@ public class ToolPaneWindow {
         Map<TourFolder, List<Tour>> folderToursMap = new HashMap<>();
         for (Tour tour : state.getTours()) {
             // 如果是demo tour，直接添加到根节点
-            if (Validator.isDemo(tour)) {
+            if (isDemo(tour)) {
                 if (StringUtils.isEmpty(searchText) ||
                         (toursTree.getCellRenderer() instanceof TreeRenderer renderer && renderer.matchesSearch(tour))) {
                     DefaultMutableTreeNode tourNode = new DefaultMutableTreeNode(tour);
@@ -709,7 +712,7 @@ public class ToolPaneWindow {
         String nodePath;
 
         if (userObject instanceof Tour tour) {
-            if (Validator.isDemo(tour)) {
+            if (isDemo(tour)) {
                 nodePath = tour.getTitle();
             } else {
                 nodePath = tour.getVirtualFile().getPath();
@@ -748,7 +751,7 @@ public class ToolPaneWindow {
         String nodePath;
 
         if (userObject instanceof Tour tour) {
-            if (Validator.isDemo(tour)) {
+            if (isDemo(tour)) {
                 nodePath = currentPath + tour.getTitle();
             } else {
                 nodePath = currentPath + tour.getVirtualFile().getPath();
@@ -895,7 +898,7 @@ public class ToolPaneWindow {
             final JMenuItem deleteAction = new JMenuItem("Delete Tour", AllIcons.Actions.DeleteTag);
             deleteAction.addActionListener(d -> deleteTourListener(tour));
 
-            if (Validator.isDemo(tour)) {
+            if (isDemo(tour)) {
                 // Disable Demo Action
                 final JMenuItem disableOnboardAssistantAction = new JMenuItem("Disable Demo",
                         AllIcons.Actions.IntentionBulbGrey);
@@ -958,7 +961,7 @@ public class ToolPaneWindow {
             final JMenuItem deleteAction = new JMenuItem("Delete Step", AllIcons.Actions.DeleteTag);
             deleteAction.addActionListener(d -> deleteStepListener(step, tour));
 
-            if (Validator.isDemo(tour)) {
+            if (isDemo(tour)) {
                 Arrays.asList(editDescriptionAction, moveUpAction, moveDownAction, deleteAction, copyReferenceAction)
                         .forEach(item -> item.setEnabled(false));
             }
